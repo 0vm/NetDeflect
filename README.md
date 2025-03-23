@@ -138,4 +138,4 @@ Sends alerts to Discord with information like:
 
 ### 🧾 License
 
-MIT License — free to use, fork, and deploy however you like.
+[MIT License](LICENSE)
