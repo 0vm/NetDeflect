@@ -136,6 +136,8 @@ Sends alerts to Discord with information like:
 - Attack vector
 - Mitigation status
 
+![{C46C5365-14F3-4F7B-A4A7-6A3D45BDB9D4}](https://github.com/user-attachments/assets/8f0e07c6-8557-498f-9a74-89f6fd42750f)
+
 ---
 
 # NOTE
