@@ -40,6 +40,7 @@ pip install psutil requests
 
 python3 netdeflect.py
 ```
+### On first use, you need to run `netdeflect.py` several times to complete setup.
 
 ---
 
