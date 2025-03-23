@@ -136,6 +136,14 @@ Sends alerts to Discord with information like:
 
 ---
 
+# NOTE
+
+If you do encounter any issues, debug has been left on for the first release, open an issue with as much info as you can.
+
+If you have any suggestions, please feel free to open an issue!
+
+---
+
 ### 🧾 License
 
 [MIT License](LICENSE)
