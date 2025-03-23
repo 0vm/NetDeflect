@@ -28,6 +28,8 @@
 
 ### 🚀 Installation
 (as root)
+
+Ideally in a screen or tmux
 ```bash
 apt install tcpdump tshark -y
 
