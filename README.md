@@ -81,9 +81,8 @@ Attack signatures are loaded from `methods.json` and include detection for:
 ---
 
 #### Flooding Attacks
-- UDP Flood  
 - Hex UDP Flood  
-- Flood of 0x00 / 0xFF  
+- Flood of 0xFF  
 - Known Botnet UDP Floods  
 - UDPMIX DNS Flood  
 - TCP Flag Abuses (SYN, ACK, RST, PSH combos)  
