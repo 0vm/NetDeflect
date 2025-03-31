@@ -1,6 +1,7 @@
 {
   "attack_types_readable": {
     "[Ookla Speedtest": "0x00000010\t\t8080",
+    "[UDP": "17\t\t",
     "[ICMP": "1\t\t",
     "[ICMP Dest Unreachable": "1,17\t\t",
     "[IPv4/Fragmented": "4\t\t",
@@ -52,6 +53,7 @@
     "[Apple serialnumberd Reflection": "17\t\t626",
     "[UDPMIX DNS Flood": "7065616365636f7270",
     "[Hex UDP Flood": "2f78",
+    "[Flood of 0x00": "0000000000000000000",
     "[TSource Engine Query": "54536f75726365",
     "[Known Botnet UDP Flood/1": "52794d47616e67",
     "[Known Botnet UDP Flood/2": "a6c300",
@@ -93,6 +95,7 @@
   },
   "attack_types": {
     "[Ookla Speedtest": "0x00000010\t\t8080",
+    "[UDP": "17\t\t",
     "[ICMP": "1\t\t",
     "[ICMP Dest Unreachable": "1,17\t\t",
     "[IPv4/Fragmented": "4\t\t",
@@ -144,6 +147,7 @@
     "[Apple serialnumberd Reflection": "17\t\t626",
     "[UDPMIX DNS Flood": "7065616365636f7270",
     "[Hex UDP Flood": "2f78",
+    "[Flood of 0x00": "0000000000000000000",
     "[TSource Engine Query": "54536f75726365",
     "[Known Botnet UDP Flood/1": "52794d47616e67",
     "[Known Botnet UDP Flood/2": "a6c300",
