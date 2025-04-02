@@ -1,6 +1,6 @@
 # NetDeflect DDoS Mitigation
 
-**NetDeflect** is an easy to use real-time DDoS detection and mitigation tool for Linux-based systems. It captures, analyzes, and classifies traffic in real-time, blocks malicious IPs based on attack signatures, provides live metrics and Discord webhook alerts.
+**NetDeflect** is an easy to use DDoS mitigation and detection tool for Linux-based systems. It captures, analyzes, and classifies traffic in real-time, blocks malicious IPs based on attack signatures, provides live metrics and Discord webhook alerts.
 
 ---
 
