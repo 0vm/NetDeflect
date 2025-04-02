@@ -141,6 +141,7 @@ Sends alerts to Discord with information like:
 ---
 
 # NOTE
+**Make sure to remove the services you use from methods.json, such as removing specific TCP flags or removing HTTP/1 reflection if you run a webserver.**
 
 If you do encounter any issues, debug has been left on for the first release, open an issue with as much info as you can.
 
