@@ -102,7 +102,7 @@ except Exception as e:
 # Your servers displayed IP address method.
 [ip_detection]
 # Options: google_dns, opendns, ipify, icanhazip, local
-ip_method = google_dns
+ip_method = opendns
 
 ########################################
 # NETWORK PACKET CAPTURE CONFIGURATION
@@ -191,7 +191,7 @@ enable_fallback_blocking=False
 # List of IPs that should NEVER be blocked, such as your home IP or critical infrastructure.
 # As it is in beta, please ensure to add your IP address to avoid being blocked.
 # Use a comma and space between entries. Example: 1.1.1.1, 8.8.8.8, 139.99.201.1
-trusted_ips=8.8.8.8, 8.8.4.4, 1.1.0.1, 1.1.1.1
+trusted_ips=8.8.8.8, 8.8.4.4, 1.1.0.1, 1.1.1.1, 216.239.32.10
 """
   # Write default configuration
   with open("settings.ini", "w", encoding='utf-8') as outfile:
