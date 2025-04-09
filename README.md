@@ -1,18 +1,42 @@
-# NetDeflect DDoS Mitigation
+# NetDeflect DDoS Mitigation v2.0
 
-**NetDeflect** is an easy to use DDoS mitigation and detection tool for Linux-based systems. It captures, analyzes, and classifies traffic in real-time, blocks malicious IPs based on attack signatures, provides live metrics and Discord webhook alerts.
+**NetDeflect** is an advanced DDoS mitigation and detection tool for Linux-based systems. It captures, analyzes, and classifies traffic in real-time, blocks malicious IPs based on attack signatures, provides live metrics, and sends Discord webhook alerts to keep you informed of any attacks.
+
+---
+
+### 📽️ Demo
+![quickdemo](https://github.com/user-attachments/assets/1b6061e4-e422-4edc-b8e2-de91bfb28b91)
+
+<details>
+<summary>Demo Video</summary>
+
+https://github.com/user-attachments/assets/2fb581f6-7f8b-4200-8feb-82b43949c464
+
+</details>
+
+<details>
+<summary>Unknown Attack Detection</summary>
+
+
+
+https://github.com/user-attachments/assets/7f1beb7a-cab0-4565-b881-c19d3e40dd83
+
+
+</details>
 
 ---
 
 ### ✨ Features
 
 - 📊 **Live Network Monitoring**: Real-time PPS, MB/s, and CPU tracking.
-- 🚨 **Automated Detection**: Detects DDoS attacks using known protocol signatures and flags.
-- 🔥 **Auto-Mitigation**: Blocks offending IPs using `iptables`, `ipset`, `ufw`, or blackhole routing.
-- 🔍 **Traffic Analysis**: Uses `tcpdump` and `tshark` to capture and inspect attack patterns.
-- 📁 **Organized Reports**: Stores pcap captures and analysis logs per incident.
-- 📡 **Discord Webhook Support**: Sends alerts with attack stats and summaries.
-- 🔄 **Self-Updating Checker**: Notifies you when a new version is available on GitHub.
+- 🚨 **Intelligent Detection**: Identifies DDoS attacks using known protocol signatures, flags, and automatically detects new attack patterns.
+- 🔥 **Comprehensive Mitigation**: Blocks offending IPs using `iptables`, `ipset`, `ufw`, or blackhole routing.
+- 🔍 **Advanced Traffic Analysis**: Uses `tcpdump` and `tshark` to capture and inspect attack patterns with automatic pattern detection.
+- 📁 **Organized Reports**: Stores pcap captures and detailed analysis logs for every incident.
+- 📡 **Discord Webhook Integration**: Sends detailed alerts with attack stats, mitigation results, and summaries.
+- 🔄 **Self-Updating**: Notifies you when a new version is available on GitHub.
+- 🌐 **External API Integration**: Connect to external firewall services and security tools via configurable API endpoints.
+- 🧠 **Auto-Pattern Detection**: Identifies and learns new attack patterns automatically.
 
 ---
 
@@ -20,16 +44,16 @@
 
 - Linux (Debian-based preferred)
 - Python 3
-- Packages `tcpdump`, `tshark`
-- Firewall `iptables`, `ipset` (optional)
-- PIP `psutil`, `requests`
+- Packages: `tcpdump`, `tshark`
+- Firewall: `iptables`, `ipset` (optional)
+- PIP packages: `psutil`, `requests`
 
 ---
 
 ### 🚀 Installation
 (as root)
 
-Ideally in a screen or tmux
+Ideally in a screen or tmux session:
 ```bash
 apt install tcpdump tshark -y
 
@@ -52,64 +76,37 @@ Your Discord webhook should be added to the `settings.ini` file.
 
 The `notification_template.json` defines the Discord embed layout and can be fully customized.
 
-Note: It's recommended to keep `enable_fallback_blocking` set to `False` to reduce the risk of false positives.
+#### New Configuration Options in v2.0:
+
+- **Advanced Mitigation Settings**:
+  - `enable_fallback_blocking`: Control whether to block IPs when no specific attack signature is identified.
+  - `block_other_attack_contributors`: Block top traffic contributors for unclassified attack types.
+  - `enable_pattern_detection`: Automatically detect and identify common attack patterns.
+  - `block_autodetected_patterns`: Choose whether to block IPs using newly detected patterns.
+  - `contributor_threshold`: Minimum traffic percentage to consider an IP as malicious.
+  - `max_pcap_files`: Control how many PCAP files to retain for historical analysis.
+
+- **External Firewall API Integration**:
+  - Connect to external security services with comprehensive configuration options.
+  - Multiple authentication methods: bearer token, basic auth, header-based.
+  - Flexible request formatting with customizable templates.
+  - Batch processing options for efficient IP submission.
 
 ---
 
-### 🧠 Attack Vector Matching
+### 🧠 Attack Detection Methodology
 
-Attack signatures are loaded from `methods.json` and include detection for:
+NetDeflect v2.0 uses a multi-layered approach to detect attacks:
 
-#### Reflection & Amplification Attacks
-- DNS Amplification: ANY, RRSIG queries  
-- NTP Reflection  
-- SSDP Reflection  
-- CLDAP Reflection  
-- SNMP, MSSQL, SSDP, MDNS, Chargen Reflection  
-- Memcached Reflection  
-- STUN, CoAP, BACnet, QOTD, SIP, ISAKMP Reflection  
-- TeamSpeak, Jenkins, Citrix, ARD, Plex, DVR, FiveM, Lantronix Reflections  
-- BitTorrent Reflection  
-- Apple serialnumberd Reflection  
-- OpenVPN, DTLS, OpenAFS Reflection  
-- vxWorks, Digiman, Crestron Reflection  
-- XDMCP, IPMI Reflection  
-- NetBIOS Reflection  
-- NAT-PMP Reflection  
-- GRE, ESP, AH Protocol Abuses  
+1. **Signature-based Detection**: Matches traffic against known attack patterns.
+2. **Volume-based Detection**: Monitors traffic thresholds (PPS, MB/s).
+3. **Automatic Pattern Discovery**: Identifies new attack patterns by analyzing traffic behavior.
+4. **Contributor Analysis**: Identifies IPs contributing abnormally high traffic volumes.
 
----
-
-#### Flooding Attacks
-- Hex UDP Flood  
-- Flood of 0xFF  
-- Known Botnet UDP Floods  
-- UDPMIX DNS Flood  
-- TCP Flag Abuses (SYN, ACK, RST, PSH combos)  
-- TCP SYN, SYN-ACK, SYN-ECN, FIN, URG, etc.  
-- Unset TCP Flags / malformed TCP  
-- Fragmented IPv4 Floods  
-- ICMP Floods / ICMP Dest Unreachable  
-- Ookla Speedtest abuse  
-
----
-
-#### Game Server & Protocol Exploits
-- Source Engine Query (getstatus) Flood  
-- ArmA Reflection (Ports 2302/2303)  
-- TeamSpeak Status Flood  
-- VSE (Valve Source Engine) Flood  
-- FiveM Reflection  
-
----
-
-#### TCP-Based Reflection Attacks
-
-Mimic or abuse standard TCP-based services:
-
-- HTTP/HTTPS Reflection  
-- BGP Reflection  
-- SMTP Reflection  
+Attack signatures are categorized into three types:
+- **Spoofed IP Attacks**: Reflection and amplification attacks with spoofed source IPs.
+- **Valid IP Attacks**: Direct attacks where the source IP is legitimate.
+- **Other Attacks**: Specialized attack types that require custom handling.
 
 ---
 
@@ -119,36 +116,98 @@ Mimic or abuse standard TCP-based services:
 netdeflect.py
 settings.ini
 notification_template.json
+methods.json
 ./application_data/
 ├── captures/           ← Raw .pcap traffic captures
-├── ips/       ← IPs identified during attacks
-├── attack_analysis/    ← Plaintext reports
+├── ips/                ← IPs identified during attacks
+├── attack_analysis/    ← Detailed reports of each attack
+├── new_detected_methods.json  ← Auto-detected attack patterns
 ```
 
 ---
 
 ### 📢 Notification Example
 
-Sends alerts to Discord with information like:
+Sends alerts to Discord with enhanced information:
 
-- PPS & MBps before mitigation
+- PPS & Mbps before mitigation
 - Blocked IP count
-- Attack vector
+- Attack vector and category
 - Mitigation status
+- Blocking strategy used
 
-![{C46C5365-14F3-4F7B-A4A7-6A3D45BDB9D4}](https://github.com/user-attachments/assets/8f0e07c6-8557-498f-9a74-89f6fd42750f)
+![{DiscordExample}](https://github.com/user-attachments/assets/58bc3755-5e1b-4eb0-99c6-c2cc79744a42)
+
+---
+
+### 🔗 External API Integration
+
+NetDeflect v2.0 can integrate with external security services:
+
+- Send blocked IPs to third-party firewalls or security services
+- Multiple sending modes: single, batch, or all IPs at once
+- Customizable request formatting
+- Support for various authentication methods
+
+Example configuration:
+```ini
+[external_firewall]
+enable_api_integration=True
+api_endpoint=https://api.example.com/firewall/block
+auth_method=bearer
+auth_token=your_api_token_here
+sending_mode=batch
+max_ips_per_batch=10
+```
+
+---
+
+### 🔍 Auto-Pattern Detection
+
+The new pattern detection system automatically:
+
+1. Analyzes traffic patterns during attacks
+2. Identifies common hex patterns across multiple sources
+3. Creates and saves new attack signatures
+4. Optionally blocks IPs using these new patterns
+
+This enables NetDeflect to learn and adapt to new attacks without manual intervention.
 
 ---
 
 # NOTE
 **Make sure to remove the services you use from methods.json, such as removing specific TCP flags or removing HTTP/1 reflection if you run a webserver.**
 
-If you do encounter any issues, debug has been left on for the first release, open an issue with as much info as you can.
+If you do encounter any issues, debug has been left on, open an issue with as much info as you can.
 
 If you have any suggestions, please feel free to open an issue!
 
 ---
 
+### Blackhole removal
+
+Remove all IP's from blackhole with the the script below:
+```bash
+#!/bin/bash
+# Remove all blackholed IP routes
+echo "Removing all blackhole routes..."
+
+ip route show | grep blackhole | awk '{print $2}' | while read ip; do
+    echo "Removing blackhole for $ip"
+    sudo ip route del blackhole "$ip"
+done
+
+echo "Done."
+```
+
+---
 
 ## Tags for SEO
-ddos-protection network-security anti-ddos ddos-mitigation network-monitor traffic-analysis ip-blacklisting linux-security packet-filtering cyber-defense network-protection attack-detection traffic-filtering dos-protection network-monitoring-tool linux-firewall python-security tcp-ip-security attack-signature-detection real-time-monitoring blackhole-routing iptables ufw ipset packet-analysis traffic-thresholds bandwidth-monitoring pps-detection mbps-monitoring protocol-analysis server-protection web-server-security game-server-protection vps-security dedicated-server-protection hosting-security cloud-security online-service-protection infrastructure-security high-availability service-continuity automated-defense ip-blocking firewall-management attack-fingerprinting signature-based-detection threshold-based-detection adaptive-protection attack-pattern-recognition security-automation incident-response intrusion-detection alert-system discord-notifications webhook-alerts sysadmin-tools devops-security infrastructure-protection security-automation network-administration linux-administration server-hardening self-hosted-security open-source-security cybersecurity-tool network-diagnostics traffic-visualization security-monitoring network-reliability syn-flood-protection udp-flood-protection icmp-flood-protection http-flood-protection amplification-attack-protection reflection-attack-protection botnet-protection volumetric-attack-protection protocol-attack-protection application-layer-protection mixed-vector-protection linux-tool command-line-utility python-application networking-tool tcpdump-integration tshark-integration ipv4-security layer-3-protection layer-4-protection udp-protection tcp-protection packet-inspection network-traffic-control
+
+Security: DDoS protection, network security, intrusion detection, attack mitigation, ddos mitigation, traffic analysis
+
+Technologies: Python, iptables, blackhole routing, tcpdump, tshark, ipset, ufw
+
+Attack Types: reflection attacks, amplification attacks, SYN floods, UDP floods, TCP abuse
+
+Features: real-time monitoring, auto-detection, pattern recognition, Discord webhooks, API integration
