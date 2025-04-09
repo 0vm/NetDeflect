@@ -180,9 +180,11 @@ mitigation_pause=55
 
 # Number of packets to capture during an attack for analysis.
 # Lower this if you experience memory or performance issues.
+# Modify this based on your port speed and how much data you expect.
 packet_count=20000
 
 # Number of attack-type occurrences required to confirm an attack.
+# If packet_count is modified, this will also need to be modified.
 # Acts as a sensitivity filter — higher value = stricter classification.
 detection_threshold=2000
 
