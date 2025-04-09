@@ -130,7 +130,7 @@ methods.json
 
 Sends alerts to Discord with enhanced information:
 
-- PPS & MBps before mitigation
+- PPS & Mbps before mitigation
 - Blocked IP count
 - Attack vector and category
 - Mitigation status
@@ -178,7 +178,7 @@ This enables NetDeflect to learn and adapt to new attacks without manual interve
 # NOTE
 **Make sure to remove the services you use from methods.json, such as removing specific TCP flags or removing HTTP/1 reflection if you run a webserver.**
 
-If you do encounter any issues, debug has been left on for the first release, open an issue with as much info as you can.
+If you do encounter any issues, debug has been left on, open an issue with as much info as you can.
 
 If you have any suggestions, please feel free to open an issue!
 
