@@ -1153,7 +1153,7 @@ def capture_and_analyze_traffic():
         
         # Use subprocess.run with timeout instead of getoutput
         try:
-            cmd = f'nice -n -20 ionice -c 1 -n 0 tcpdump "{filter_arguments}" -i {network_interface} -n -s0 -B 8096 -c {packet_count} -w {capture_file}'
+            cmd = f'timeout 28 nice -n -20 ionice -c 1 -n 0 tcpdump "{filter_arguments}" -i {network_interface} -n -s0 -B 8096 -c {packet_count} -w {capture_file}'
             process = subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30)
         except subprocess.TimeoutExpired:
             print(f"{get_output_prefix()} tcpdump timed out after 30 seconds, continuing with analysis...")
