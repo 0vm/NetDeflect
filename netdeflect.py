@@ -1502,8 +1502,6 @@ def evaluate_mitigation(pps, mbps):
         return "Ongoing Attack"
 
 # Send notification webhook
-# Send notification webhook
-# Send notification webhook
 def send_notification(notification_template, attack_id, pps, mbps, cpu_usage, status, total_ips, attack_signatures_readable, attack_categories, auto_detected=False, pattern_label=None):
     # Format attack categories for notification
     attack_category_str = ', '.join(attack_categories) if attack_categories else "Unknown"
