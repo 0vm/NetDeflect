@@ -184,5 +184,30 @@ If you have any suggestions, please feel free to open an issue!
 
 ---
 
+### Blackhole removal
+
+Remove all IP's from blackhole with the the script below:
+```bash
+#!/bin/bash
+# Remove all blackholed IP routes
+echo "Removing all blackhole routes..."
+
+ip route show | grep blackhole | awk '{print $2}' | while read ip; do
+    echo "Removing blackhole for $ip"
+    sudo ip route del blackhole "$ip"
+done
+
+echo "Done."
+```
+
+---
+
 ## Tags for SEO
-ddos-protection network-security anti-ddos ddos-mitigation network-monitor traffic-analysis ip-blacklisting linux-security packet-filtering cyber-defense network-protection attack-detection traffic-filtering dos-protection network-monitoring-tool linux-firewall python-security tcp-ip-security attack-signature-detection real-time-monitoring blackhole-routing iptables ufw ipset packet-analysis traffic-thresholds bandwidth-monitoring pps-detection mbps-monitoring protocol-analysis server-protection web-server-security game-server-protection vps-security dedicated-server-protection hosting-security cloud-security online-service-protection infrastructure-security high-availability service-continuity automated-defense ip-blocking firewall-management attack-fingerprinting signature-based-detection threshold-based-detection adaptive-protection attack-pattern-recognition security-automation incident-response intrusion-detection alert-system discord-notifications webhook-alerts sysadmin-tools devops-security infrastructure-protection security-automation network-administration linux-administration server-hardening self-hosted-security open-source-security cybersecurity-tool network-diagnostics traffic-visualization security-monitoring network-reliability syn-flood-protection udp-flood-protection icmp-flood-protection http-flood-protection amplification-attack-protection reflection-attack-protection botnet-protection volumetric-attack-protection protocol-attack-protection application-layer-protection mixed-vector-protection linux-tool command-line-utility python-application networking-tool tcpdump-integration tshark-integration ipv4-security layer-3-protection layer-4-protection udp-protection tcp-protection packet-inspection network-traffic-control
+
+Security: DDoS protection, network security, intrusion detection, attack mitigation, ddos mitigation, traffic analysis
+
+Technologies: Python, iptables, blackhole routing, tcpdump, tshark, ipset, ufw
+
+Attack Types: reflection attacks, amplification attacks, SYN floods, UDP floods, TCP abuse
+
+Features: real-time monitoring, auto-detection, pattern recognition, Discord webhooks, API integration
