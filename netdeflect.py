@@ -781,26 +781,6 @@ def parse_json_config(json_string):
         print(f"{get_output_prefix()} {TerminalColor.RED}Error parsing JSON config: {str(e)}{TerminalColor.RESET}")
         return {}
 
-def identify_malicious_ips_by_signature(capture_file):
-    # Identify IPs that match known attack signatures
-    malicious_ips = set()
-    
-    # For each attack signature, find IPs sending packets matching that signature
-    for signature in AttackVectors.attack_signatures:
-        pattern = AttackVectors.attack_signatures[signature]
-        
-        # Extract IPs sending packets that match this signature
-        # The filter expression will depend on what exactly is in your signature patterns
-        signature_filter = f"frame contains \"{pattern}\""
-        matching_ips = subprocess.getoutput(f'sudo tshark -r {capture_file} -Y "{signature_filter}" -T fields -e ip.src | sort | uniq')
-        
-        # Add these IPs to our malicious set
-        for ip in matching_ips.strip().split('\n'):
-            if ip.strip():
-                malicious_ips.add(ip.strip())
-    
-    return list(malicious_ips)
-
 # Get network statistics
 def get_network_stats():
     # Collect initial network stats
@@ -1286,39 +1266,6 @@ def capture_and_analyze_traffic():
         except:
             pass
         return "", empty_file, "", "unknown", [], set()
-
-# Helper function to find top traffic contributors
-def find_top_traffic_contributors(capture_file, top_count=5, min_percentage=30):
-    try:
-        # Get top traffic contributors
-        cmd = f'sudo tshark -r {capture_file} -T fields -e ip.src | sort | uniq -c | sort -nr | head -{top_count}'
-        process = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        
-        top_ips = []
-        
-        if process.returncode == 0 and process.stdout.strip():
-            # Extract top IPs with counts
-            for line in process.stdout.strip().split('\n'):
-                if line.strip():
-                    parts = line.strip().split()
-                    if len(parts) >= 2:
-                        try:
-                            count = int(parts[0])
-                            ip = parts[1]
-                            
-                            # Calculate percentage of total packets
-                            percent = (count * 100) / packet_count
-                            
-                            # Only consider valid IPs
-                            if re.match(r'^(\d{1,3}\.){3}\d{1,3}$', ip):
-                                top_ips.append((ip, count, percent))
-                        except (ValueError, IndexError):
-                            continue
-        
-        return top_ips
-    except Exception as e:
-        print(f"{get_output_prefix()} Error finding top traffic contributors: {str(e)}")
-        return []
 
 # Helper function to find source IPs for a given attack pattern
 def find_attack_source_ips(capture_file, signature_name, pattern):
