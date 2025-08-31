@@ -66,6 +66,8 @@ python3 netdeflect.py
 ```
 ### On first use, you will need to run `netdeflect.py` several times to complete setup.
 
+For CentOS 7 please check: https://github.com/0vm/NetDeflect/issues/10
+
 ---
 
 ### ⚙️ Configuration
