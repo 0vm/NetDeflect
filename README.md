@@ -11,6 +11,26 @@ sudo bash install.sh
 
 That is the whole setup. The installer pulls its few dependencies (Python, nftables, iproute2), asks whether to run it now in the current folder or install it as a systemd service, runs a short guided wizard (your interface, your game or VPN ports, a Discord webhook, your machine size, and watch-only or live) and checks your system. A few minutes, five questions, done. Nothing is built from source and there are no kernel requirements. Prefer to do it by hand? See [Manual install](#manual-install).
 
+## Demo
+
+https://github.com/user-attachments/assets/8ac4f69f-974f-4bde-91dd-708f092744d2
+
+
+<details>
+<summary>Older demos (v2)</summary>
+
+![quickdemo](https://github.com/user-attachments/assets/1b6061e4-e422-4edc-b8e2-de91bfb28b91)
+
+**Demo video**
+
+https://github.com/user-attachments/assets/2fb581f6-7f8b-4200-8feb-82b43949c464
+
+**Unknown attack detection**
+
+https://github.com/user-attachments/assets/7f1beb7a-cab0-4565-b881-c19d3e40dd83
+
+</details>
+
 ## What it stops
 
 - **Volumetric floods:** UDP, SYN, ACK/RST/FIN, ICMP, fragment and crafted-packet floods, from spoofed or real sources.
@@ -101,6 +121,7 @@ Searching for XDP or eBPF? NetDeflect can drop banned sources in the NIC driver 
 - Prometheus metrics (node_exporter textfile or a built-in `/metrics` page).
 - JSON event log for SIEM tools.
 - Send blocked addresses to an external firewall or provider API.
+<img width="300" alt="image" src="https://github.com/user-attachments/assets/811dda40-0d36-4949-adf6-9e7717884e14" />
 
 ### Operations
 - Guided setup (`--setup`) and a one-command installer with a systemd service.
