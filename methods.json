@@ -1,106 +1,762 @@
 {
-  "spoofed_ip_attacks": {
-    "OVH-BYPASS/1": "fefefefe",
-    "OVH-BYPASS/2": "4a4a4a4a",
-    "Flood of 0xFF": "fffffffffff",
-    "Flood of 0x00": "0000000000000000000",
-    "UDP getstatus Flood": "676574737461747573",
-    "OVH-BYPASS/UDP-HEX": "4f56482d424f544e4554",
-    "OVH-BYPASS/VSE": "ffffffff56534572636520456e67696e6520517565727900"
-  },
-  "valid_ip_attacks": {
-    "Mirai Variant/1": "476f6f64627965",
-    "Mirai Variant/2": "41414141",
-    "Qbot/1": "51424f542d4e4554",
-    "Legion UDP": "4c4547494f4e",
-    "Chaos UDP": "4348414f5320425950415353",
-    "TCP SYN Flood/Custom-MSS": "0x0200000005b4",
-    "TCP SYN Flood/Window-Scale": "0x0200000c0714",
-    "TeamSpeak Status Flood": "545333494e49",
-    "VSE Flood/1": "17\t\t27015",
-    "UDPMIX DNS Flood": "7065616365636f7270",
-    "Hex UDP Flood": "2f78",
-    "Known Botnet UDP Flood/1": "52794d47616e67",
-    "Known Botnet UDP Flood/2": "a6c300",
-    "OpenVPN Reflection": "17\t\t1194",
-    "RRSIG DNS Query Reflection": "002e0001",
-    "ANY DNS Query Reflection": "00ff0001",
-    "NTP Reflection": "17\t\t123",
-    "Chargen Reflection": "17\t\t19",
-    "MDNS Reflection": "17\t\t5353",
-    "BitTorrent Reflection": "17\t\t6881",
-    "CLDAP Reflection": "17\t\t389",
-    "STUN Reflection": "17\t\t3478",
-    "MSSQL Reflection": "17\t\t1434",
-    "SNMP Reflection": "17\t\t161",
-    "WSD Reflection": "17\t\t3702",
-    "DTLS Reflection": "17\t\t443\t\t40",
-    "OpenAFS Reflection": "17\t\t7001",
-    "ARD Reflection": "17\t\t3283",
-    "BFD Reflection": "17\t\t3784",
-    "SSDP Reflection": "17\t\t1900",
-    "ArmA Reflection/1": "17\t\t2302",
-    "ArmA Reflection/2": "17\t\t2303",
-    "vxWorks Reflection": "17\t\t17185",
-    "Plex Reflection": "17\t\t32414",
-    "TeamSpeak Reflection": "17\t\t9987",
-    "Lantronix Reflection": "17\t\t30718",
-    "DVR IP Reflection": "17\t\t37810",
-    "Jenkins Reflection": "17\t\t33848",
-    "Citrix Reflection": "17\t\t1604",
-    "NAT-PMP Reflection": "008000",
-    "Memcache Reflection": "17\t\t11211",
-    "NetBIOS Reflection": "17\t\t137",
-    "SIP Reflection": "17\t\t5060",
-    "Digiman Reflection": "17\t\t2362",
-    "Crestron Reflection": "17\t\t41794",
-    "CoAP Reflection": "17\t\t5683",
-    "BACnet Reflection": "17\t\t47808",
-    "FiveM Reflection": "17\t\t30120",
-    "Modbus Reflection": "17\t\t502",
-    "QOTD Reflection": "17\t\t17",
-    "ISAKMP Reflection": "17\t\t500",
-    "XDMCP Reflection": "17\t\t177",
-    "IPMI Reflection": "17\t\t623",
-    "Apple serialnumberd Reflection": "17\t\t626",
-    "TCP Reflection from HTTPS/1": "0x00000012\t\t443",
-    "TCP Reflection from HTTPS/2": "0x00000010\t\t443",
-    "TCP Reflection from HTTP/1": "0x00000012\t\t80",
-    "TCP Reflection from HTTP/2": "0x00000010\t\t80",
-    "TCP Reflection from BGP/1": "0x00000012\t\t179",
-    "TCP Reflection from BGP/2": "0x00000010\t\t179",
-    "TCP Reflection from SMTP/1": "0x00000012\t\t465",
-    "TCP Reflection from SMTP/2": "0x00000010\t\t465",
-    "Apple serial number Reflection": "17\t\t626",
-    "TSource Engine Query": "54536f75726365"
-  },
-  "other_attacks": {
-    "ICMP": "1\t\t",
-    "ICMP Dest Unreachable": "1,17\t\t",
-    "GRE": "47\t\t",
-    "IPX": "111\t\t",
-    "AH": "51\t\t",
-    "ESP": "50\t\t",
-    "TCP SYN-ACK": "0x00000012",
-    "TCP PSH-ACK": "0x00000018",
-    "TCP RST-ACK": "0x00000014",
-    "TCP FIN": "0x00000001",
-    "TCP SYN": "0x00000002",
-    "TCP PSH": "0x00000008",
-    "TCP URG": "0x00000020",
-    "TCP RST": "0x00000004",
-    "TCP ACK": "0x00000010",
-    "Unset TCP Flags": "0x00000000",
-    "TCP SYN-ECN-CWR": "0x000000c2",
-    "TCP SYN-ECN": "0x00000042",
-    "TCP SYN-CWR": "0x00000082",
-    "TCP SYN-PSH-ACK-URG": "0x0000003a",
-    "TCP SYN-ACK-ECN-CWR": "0x000000d2",
-    "TCP PSH-ACK-URG": "0x00000038",
-    "TCP FIN-SYN-RST-PSH-ACK-URG": "0x0000003f",
-    "TCP RST-ACK-URG-CWR-Reserved": "0x000004b4",
-    "TCP SYN-PSH-URG-ECN-CWR-Reserved": "0x000004ea",
-    "TCP FIN-RST-PSH-ECN-CWR-Reserved": "0x00000ccd",
-    "TCP FIN-RST-PSH-ACK-URG-ECN-CWR-eserved": "0x00000cfd"
-  }
+  "_comment": "NetDeflect v4 signature database. Each signature matches EXACT packet fields. category decides the mitigation strategy and whether the source is trusted (see CATEGORY_POLICY in netdeflect.py). Categories: reflection/amplification (sport-keyed responses from REAL reflectors; pattern-drop + optional null-route), reflection_tcp (unsolicited TCP replies; needs conntrack, source never blocked), dns_query/amplifier_abuse (reflection-trigger QUERIES arriving at us; forged source, per-source rate-limit), udp_flood/tcp_flood/tcp_flag/proto_flood/fragment_flood (forged source, pattern-drop, NEVER IP-blocked), syn_flood (per-source SYN rate-limit + cookies), icmp_flood (per-source rate-limit), stateful_flood (out-of-state; needs conntrack drop_invalid), botnet/scanner (REAL source, IP-blocked), game_query (connectionless UDP queries; forged, rate-limit), conn_flood (per-source connection cap; needs conntrack). Match fields: proto, sport/dport (int or list), tcp_flags (exact set, e.g. 'SYN,ACK' or 'none'; ECE/CWR honoured), tcp_flags_mask, payload_hex (+ payload_offset to anchor, payload_mask_hex for bit tests), min_len/max_len (IP datagram length), ttl_min/ttl_max, tos (DSCP byte), icmp_type/icmp_code, tcp_mss (int, [lo,hi] or 'missing'), tcp_window, tcp_reserved (int or 'nonzero'), src_ip/dst_ip (CIDR), frag ('first'|'later'|'any'). Per-rule: action (drop/allow/ratelimit/block_src/report), rate_pps, rate_bps, log, enabled, block_time, min_packets, min_percent, real_source (override).",
+  "signatures": [
+    {
+      "name": "NTP Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 123,
+      "min_len": 90
+    },
+    {
+      "name": "DNS Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 53,
+      "min_len": 300
+    },
+    {
+      "name": "SSDP Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 1900,
+      "min_len": 200
+    },
+    {
+      "name": "SNMP Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 161,
+      "min_len": 150
+    },
+    {
+      "name": "CLDAP Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 389,
+      "min_len": 200
+    },
+    {
+      "name": "Memcached Reflection",
+      "category": "amplification",
+      "proto": "udp",
+      "sport": 11211,
+      "min_len": 1000
+    },
+    {
+      "name": "Chargen Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 19,
+      "min_len": 200
+    },
+    {
+      "name": "QOTD Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 17,
+      "min_len": 48
+    },
+    {
+      "name": "Echo Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 7,
+      "min_len": 48
+    },
+    {
+      "name": "Daytime Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 13,
+      "min_len": 40
+    },
+    {
+      "name": "Time Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 37,
+      "min_len": 40
+    },
+    {
+      "name": "NetBIOS Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 137,
+      "min_len": 100
+    },
+    {
+      "name": "Portmap/RPCbind Reflection",
+      "category": "amplification",
+      "proto": "udp",
+      "sport": 111,
+      "min_len": 100
+    },
+    {
+      "name": "mDNS Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 5353,
+      "min_len": 150
+    },
+    {
+      "name": "STUN Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 3478,
+      "min_len": 100
+    },
+    {
+      "name": "MSSQL Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 1434,
+      "min_len": 100
+    },
+    {
+      "name": "WSD Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 3702,
+      "min_len": 300
+    },
+    {
+      "name": "TFTP Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 69,
+      "min_len": 64
+    },
+    {
+      "name": "RIPv1 Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 520,
+      "min_len": 100
+    },
+    {
+      "name": "Sentinel Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 5093,
+      "min_len": 100
+    },
+    {
+      "name": "Quake3 Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 27960,
+      "payload_hex": "ffffffff",
+      "payload_offset": 0,
+      "min_len": 100
+    },
+    {
+      "name": "OpenVPN Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 1194,
+      "min_len": 100
+    },
+    {
+      "name": "CoAP Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 5683,
+      "min_len": 64
+    },
+    {
+      "name": "Ubiquiti Discovery Reflection",
+      "category": "amplification",
+      "proto": "udp",
+      "sport": 10001,
+      "min_len": 100
+    },
+    {
+      "name": "DVR DHCPDiscover Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 37810,
+      "min_len": 100
+    },
+    {
+      "name": "Jenkins Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 33848,
+      "min_len": 100,
+      "payload_hex": "3c687564736f6e3e"
+    },
+    {
+      "name": "Citrix ME Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 1604,
+      "min_len": 100
+    },
+    {
+      "name": "Plex Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 32414,
+      "min_len": 100
+    },
+    {
+      "name": "BitTorrent DHT Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 6881,
+      "min_len": 100
+    },
+    {
+      "name": "Lantronix Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 30718,
+      "min_len": 64
+    },
+    {
+      "name": "Digiman Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 2362,
+      "min_len": 100
+    },
+    {
+      "name": "ARD Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 3283,
+      "min_len": 100
+    },
+    {
+      "name": "Apple serialnumberd Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 626,
+      "min_len": 60
+    },
+    {
+      "name": "NAT-PMP Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 5351,
+      "min_len": 40
+    },
+    {
+      "name": "Modbus Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 502,
+      "min_len": 64
+    },
+    {
+      "name": "BACnet Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 47808,
+      "min_len": 64
+    },
+    {
+      "name": "SIP Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 5060,
+      "min_len": 200
+    },
+    {
+      "name": "ISAKMP Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 500,
+      "min_len": 100
+    },
+    {
+      "name": "IPMI Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 623,
+      "min_len": 100
+    },
+    {
+      "name": "XDMCP Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 177,
+      "min_len": 100
+    },
+    {
+      "name": "vxWorks WDBRPC Reflection",
+      "category": "amplification",
+      "proto": "udp",
+      "sport": 17185,
+      "min_len": 100
+    },
+    {
+      "name": "Crestron Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 41794,
+      "min_len": 100
+    },
+    {
+      "name": "OpenAFS Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 7001,
+      "min_len": 100
+    },
+    {
+      "name": "BFD Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 3784,
+      "min_len": 40
+    },
+    {
+      "name": "SLP Reflection",
+      "category": "amplification",
+      "proto": "udp",
+      "sport": 427,
+      "min_len": 100
+    },
+    {
+      "name": "Mitel TP240 Reflection",
+      "category": "amplification",
+      "proto": "udp",
+      "sport": 10074,
+      "min_len": 100
+    },
+    {
+      "name": "DTLS Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 443,
+      "payload_hex": "16fefd",
+      "payload_offset": 0
+    },
+    {
+      "name": "ArmA Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": [
+        2302,
+        2303
+      ],
+      "payload_hex": "ffffffff",
+      "payload_offset": 0,
+      "min_len": 100
+    },
+    {
+      "name": "FiveM Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 30120,
+      "payload_hex": "ffffffff",
+      "payload_offset": 0,
+      "min_len": 100
+    },
+    {
+      "name": "TeamSpeak3 Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 9987,
+      "min_len": 100
+    },
+    {
+      "name": "RDP UDP Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 3389,
+      "min_len": 100
+    },
+    {
+      "name": "Steam A2S Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 27015,
+      "payload_hex": "ffffffff",
+      "payload_offset": 0,
+      "min_len": 100
+    },
+    {
+      "name": "GTPv1-U Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 2152,
+      "min_len": 100
+    },
+    {
+      "name": "L2TP Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 1701,
+      "min_len": 100
+    },
+    {
+      "name": "IKEv2/NAT-T Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 4500,
+      "min_len": 100
+    },
+    {
+      "name": "Kerberos Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 88,
+      "min_len": 100
+    },
+    {
+      "name": "DNS ANY Query (reflection trigger)",
+      "category": "dns_query",
+      "proto": "udp",
+      "dport": 53,
+      "payload_hex": "00ff0001"
+    },
+    {
+      "name": "DNS RRSIG Query (reflection trigger)",
+      "category": "dns_query",
+      "proto": "udp",
+      "dport": 53,
+      "payload_hex": "002e0001"
+    },
+    {
+      "name": "TCP Reflection HTTPS (SYN-ACK)",
+      "category": "reflection_tcp",
+      "proto": "tcp",
+      "sport": 443,
+      "tcp_flags": "SYN,ACK"
+    },
+    {
+      "name": "TCP Reflection HTTPS (RST-ACK)",
+      "category": "reflection_tcp",
+      "proto": "tcp",
+      "sport": 443,
+      "tcp_flags": "RST,ACK"
+    },
+    {
+      "name": "TCP Reflection HTTP (SYN-ACK)",
+      "category": "reflection_tcp",
+      "proto": "tcp",
+      "sport": 80,
+      "tcp_flags": "SYN,ACK"
+    },
+    {
+      "name": "TCP Reflection HTTP (RST-ACK)",
+      "category": "reflection_tcp",
+      "proto": "tcp",
+      "sport": 80,
+      "tcp_flags": "RST,ACK"
+    },
+    {
+      "name": "TCP Reflection BGP (SYN-ACK)",
+      "category": "reflection_tcp",
+      "proto": "tcp",
+      "sport": 179,
+      "tcp_flags": "SYN,ACK"
+    },
+    {
+      "name": "TCP Reflection SMTPS (SYN-ACK)",
+      "category": "reflection_tcp",
+      "proto": "tcp",
+      "sport": 465,
+      "tcp_flags": "SYN,ACK"
+    },
+    {
+      "name": "TCP SYN Flood",
+      "category": "syn_flood",
+      "proto": "tcp",
+      "tcp_flags": "SYN"
+    },
+    {
+      "name": "TCP SYN Flood (no MSS)",
+      "category": "syn_flood",
+      "proto": "tcp",
+      "tcp_flags": "SYN",
+      "tcp_mss": "missing"
+    },
+    {
+      "name": "TCP SYN Flood (tiny MSS)",
+      "category": "syn_flood",
+      "proto": "tcp",
+      "tcp_flags": "SYN",
+      "tcp_mss": [
+        1,
+        535
+      ]
+    },
+    {
+      "name": "TCP SYN-ACK Flood",
+      "category": "stateful_flood",
+      "proto": "tcp",
+      "tcp_flags": "SYN,ACK"
+    },
+    {
+      "name": "TCP ACK Flood",
+      "category": "stateful_flood",
+      "proto": "tcp",
+      "tcp_flags": "ACK"
+    },
+    {
+      "name": "TCP PSH-ACK Flood",
+      "category": "stateful_flood",
+      "proto": "tcp",
+      "tcp_flags": "PSH,ACK"
+    },
+    {
+      "name": "TCP RST Flood",
+      "category": "stateful_flood",
+      "proto": "tcp",
+      "tcp_flags": "RST"
+    },
+    {
+      "name": "TCP RST-ACK Flood",
+      "category": "stateful_flood",
+      "proto": "tcp",
+      "tcp_flags": "RST,ACK"
+    },
+    {
+      "name": "TCP FIN Flood",
+      "category": "stateful_flood",
+      "proto": "tcp",
+      "tcp_flags": "FIN"
+    },
+    {
+      "name": "TCP NULL Scan/Flood",
+      "category": "tcp_flag",
+      "proto": "tcp",
+      "tcp_flags": "none"
+    },
+    {
+      "name": "TCP XMAS Scan/Flood",
+      "category": "tcp_flag",
+      "proto": "tcp",
+      "tcp_flags": "FIN,PSH,URG"
+    },
+    {
+      "name": "TCP SYN-FIN",
+      "category": "tcp_flag",
+      "proto": "tcp",
+      "tcp_flags": "SYN,FIN"
+    },
+    {
+      "name": "TCP SYN-RST",
+      "category": "tcp_flag",
+      "proto": "tcp",
+      "tcp_flags": "SYN,RST"
+    },
+    {
+      "name": "TCP Reserved-bit set",
+      "category": "tcp_flag",
+      "proto": "tcp",
+      "tcp_reserved": "nonzero"
+    },
+    {
+      "name": "TCP SYN-ACK with ECE+CWR",
+      "category": "tcp_flag",
+      "proto": "tcp",
+      "tcp_flags": "SYN,ACK,ECE,CWR",
+      "tcp_flags_mask": "SYN,ACK,ECE,CWR"
+    },
+    {
+      "name": "ICMP Echo Flood",
+      "category": "icmp_flood",
+      "proto": "icmp",
+      "icmp_type": 8
+    },
+    {
+      "name": "ICMPv6 Echo Flood",
+      "category": "icmp_flood",
+      "proto": "icmp6",
+      "icmp_type": 128
+    },
+    {
+      "name": "GRE Flood",
+      "category": "proto_flood",
+      "proto": "gre"
+    },
+    {
+      "name": "ESP Flood",
+      "category": "proto_flood",
+      "proto": "esp"
+    },
+    {
+      "name": "AH Flood",
+      "category": "proto_flood",
+      "proto": "ah"
+    },
+    {
+      "name": "IPX-in-IP Flood",
+      "category": "proto_flood",
+      "proto": 111
+    },
+    {
+      "name": "Mirai Variant (Goodbye)",
+      "category": "botnet",
+      "proto": "udp",
+      "payload_hex": "476f6f64627965"
+    },
+    {
+      "name": "Known Botnet UDP (a6c300)",
+      "category": "botnet",
+      "proto": "udp",
+      "payload_hex": "a6c300",
+      "payload_offset": 0
+    },
+    {
+      "name": "Qbot",
+      "category": "botnet",
+      "proto": "udp",
+      "payload_hex": "51424f542d4e4554"
+    },
+    {
+      "name": "Legion UDP",
+      "category": "botnet",
+      "proto": "udp",
+      "payload_hex": "4c4547494f4e"
+    },
+    {
+      "name": "Chaos UDP Bypass",
+      "category": "botnet",
+      "proto": "udp",
+      "payload_hex": "4348414f5320425950415353"
+    },
+    {
+      "name": "RyMGang UDP",
+      "category": "botnet",
+      "proto": "udp",
+      "payload_hex": "52794d47616e67"
+    },
+    {
+      "name": "UDPMIX peacecorp",
+      "category": "botnet",
+      "proto": "udp",
+      "payload_hex": "7065616365636f7270"
+    },
+    {
+      "name": "OVH-BOTNET UDP",
+      "category": "botnet",
+      "proto": "udp",
+      "payload_hex": "4f56482d424f544e4554"
+    },
+    {
+      "name": "Condi UDP",
+      "category": "botnet",
+      "proto": "udp",
+      "payload_hex": "636f6e6469"
+    },
+    {
+      "name": "Fodcha/Spike UDP",
+      "category": "botnet",
+      "proto": "udp",
+      "payload_hex": "737069686b65"
+    },
+    {
+      "name": "Hex-string Stresser UDP",
+      "category": "botnet",
+      "proto": "udp",
+      "payload_hex": "73747265737365"
+    },
+    {
+      "name": "TeamSpeak TS3INIT Flood",
+      "category": "game_query",
+      "proto": "udp",
+      "payload_hex": "545333494e4954",
+      "payload_offset": 0
+    },
+    {
+      "name": "Source Engine A2S Query",
+      "category": "game_query",
+      "proto": "udp",
+      "payload_hex": "ffffffff54536f75726365",
+      "payload_offset": 0
+    },
+    {
+      "name": "FiveM getinfo Flood",
+      "category": "game_query",
+      "proto": "udp",
+      "payload_hex": "ffffffff676574696e666f",
+      "payload_offset": 0
+    },
+    {
+      "name": "FiveM getstatus Flood",
+      "category": "game_query",
+      "proto": "udp",
+      "payload_hex": "ffffffff676574737461747573",
+      "payload_offset": 0
+    },
+    {
+      "name": "Quake3 getstatus Flood",
+      "category": "game_query",
+      "proto": "udp",
+      "payload_hex": "ffffffff676574737461747573",
+      "payload_offset": 0,
+      "dport": 27960
+    },
+    {
+      "name": "SA-MP Query Flood",
+      "category": "game_query",
+      "proto": "udp",
+      "payload_hex": "53414d50",
+      "payload_offset": 0
+    },
+    {
+      "name": "Minecraft Query Flood",
+      "category": "game_query",
+      "proto": "udp",
+      "payload_hex": "fefd",
+      "payload_offset": 0
+    },
+    {
+      "name": "Minecraft Bedrock/RakNet Ping",
+      "category": "game_query",
+      "proto": "udp",
+      "payload_hex": "00ffff00fefefefefdfdfdfd12345678",
+      "payload_offset": 1
+    },
+    {
+      "name": "Flood of 0xFF",
+      "category": "udp_flood",
+      "proto": "udp",
+      "payload_hex": "ffffffffffffffffffffffffffffffff",
+      "payload_offset": 0
+    },
+    {
+      "name": "Zero-fill UDP Flood",
+      "category": "udp_flood",
+      "proto": "udp",
+      "payload_hex": "00000000000000000000000000000000",
+      "payload_offset": 0
+    },
+    {
+      "name": "OVH-BYPASS (0xFE)",
+      "category": "udp_flood",
+      "proto": "udp",
+      "payload_hex": "fefefefefefefefe",
+      "payload_offset": 0
+    },
+    {
+      "name": "OVH-BYPASS (0x4A)",
+      "category": "udp_flood",
+      "proto": "udp",
+      "payload_hex": "4a4a4a4a4a4a4a4a",
+      "payload_offset": 0
+    },
+    {
+      "name": "Netis Router Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 53413,
+      "min_len": 100
+    },
+    {
+      "name": "Steam Remote Play Reflection",
+      "category": "reflection",
+      "proto": "udp",
+      "sport": 27036,
+      "min_len": 100,
+      "payload_hex": "ffffffff",
+      "payload_offset": 0
+    }
+  ]
 }
