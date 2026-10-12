@@ -6332,7 +6332,7 @@ def run_cycle(cfg, ctx, nic_pps, nic_mbps, cpu0, packets=None):
             "net_count": len(result.blocked_nets), "target_ip": report["target_ip"],
             "target_port": report["target_port"], "attack_vector": report["attack_vector"],
             "attack_category": report["attack_category"], "blocking_strategy": strategy_str,
-            "report_file": os.path.basename(report_path),
+            "report_file": os.path.basename(report_path) + (f"\n\n[Update available: {_update_tag[0]}](https://github.com/0vm/NetDeflect/releases/latest)" if _update_tag[0] else ""),
         }
         send_discord(cfg["webhook_url"], ctx["template"], fields)
         send_text_webhook(cfg["text_webhook_url"],
