@@ -76,6 +76,20 @@ On Fedora, Rocky or AlmaLinux: `dnf install python3 python3-psutil python3-reque
 </details>
 
 > 💡 **First day tip:** start in watch-only mode. NetDeflect reports exactly what it *would* block without blocking anything, so you can check it suits your traffic before switching it on.
+<details>
+<summary>Installer options and upgrading</summary>
+
+To update, `git pull` and run `sudo bash install.sh` again. Your settings are kept, a methods.json you edited is saved as `methods.json.bak`, and the service is restarted on the new version.
+
+| Option | What it does |
+|---|---|
+| `--service` | Install as a service without asking |
+| `--here` | Set it up in the current folder without asking |
+| `--with-xdp` | Also install xdp-tools for the optional XDP fast path |
+
+Run without a terminal (for example from a provisioning script), the installer writes a default settings.ini in watch-only mode, so nothing is blocked until you've set your ports and switched `enable_ban` back to True.
+
+</details>
 
 ---
 
