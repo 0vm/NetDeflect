@@ -473,7 +473,8 @@
       "category": "syn_flood",
       "proto": "tcp",
       "tcp_flags": "SYN",
-      "tcp_mss": "missing"
+      "tcp_mss": "missing",
+      "action": "drop"
     },
     {
       "name": "TCP SYN Flood (tiny MSS)",
@@ -483,7 +484,8 @@
       "tcp_mss": [
         1,
         535
-      ]
+      ],
+      "action": "drop"
     },
     {
       "name": "TCP SYN-ACK Flood",
@@ -537,13 +539,15 @@
       "name": "TCP SYN-FIN",
       "category": "tcp_flag",
       "proto": "tcp",
-      "tcp_flags": "SYN,FIN"
+      "tcp_flags": "SYN,FIN",
+      "action": "drop"
     },
     {
       "name": "TCP SYN-RST",
       "category": "tcp_flag",
       "proto": "tcp",
-      "tcp_flags": "SYN,RST"
+      "tcp_flags": "SYN,RST",
+      "action": "drop"
     },
     {
       "name": "TCP Reserved-bit set",
@@ -556,7 +560,8 @@
       "category": "tcp_flag",
       "proto": "tcp",
       "tcp_flags": "SYN,ACK,ECE,CWR",
-      "tcp_flags_mask": "SYN,ACK,ECE,CWR"
+      "tcp_flags_mask": "SYN,ACK,ECE,CWR",
+      "action": "drop"
     },
     {
       "name": "ICMP Echo Flood",
