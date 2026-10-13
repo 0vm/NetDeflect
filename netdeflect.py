@@ -503,6 +503,11 @@ def load_signatures(cfg=None):
                 for entry in auto_data:
                     if isinstance(entry, dict):
                         entry.setdefault("category", "udp_flood")
+                        # learned patterns are saved with "label" and a single
+                        # "ttl"; map them to the signature fields so they reload
+                        entry.setdefault("name", entry.get("label") or "Auto_learned")
+                        if entry.get("ttl") is not None and entry.get("ttl_min") is None:
+                            entry["ttl_min"] = entry["ttl_max"] = entry["ttl"]
                         # legacy v2 category names -> v4 categories
                         if entry.get("category") in ("valid_ip_attacks", "spoofed_ip_attacks"):
                             entry["category"] = "udp_flood"
@@ -754,10 +759,20 @@ block_flood_contributors = False
 flood_contributor_percent = 30
 flood_contributor_max_sources = 8
 flood_contributor_block_time = 600
-; Learn new attack patterns from attacks no signature recognises.
+; Learn new attack patterns from attacks no signature recognises, by fingerprinting
+; the whole packet (source port, TTL, TCP window, DSCP, TCP flags, length, payload)
+; and building the most specific drop rule that still covers the attack.
 enable_pattern_detection = True
-; Act on learned patterns straight away (False = save them for you to review).
+; Automatically enforce a HIGH-confidence learned pattern (two or more matching
+; header fields, or a shared payload) as a spoof-safe pattern drop. This is what
+; stops an attack no built-in signature knows. Turn it off to only log them.
+autodetect_enforce = True
+; Also enforce LOWER-confidence learned patterns (one marker). Off by default;
+; these are saved for you to review instead.
 block_autodetected_patterns = False
+; A header field counts as part of the fingerprint when this percentage of the
+; attack's packets share it. Higher = stricter (fewer, more certain patterns).
+autodetect_marker_pct = 85
 ; Guards so normal traffic is never learned as an attack:
 autodetect_min_sources = 5
 autodetect_min_percent = 15
@@ -850,6 +865,16 @@ prometheus_port = 9209
 [notification]
 ; Discord webhook for attack alerts. Leave as is to turn Discord alerts off.
 webhook_url = https://discord.com/api/webhooks/CHANGE-ME
+; How Discord alerts look:
+;   rich     - built-in embed, coloured by result (green mitigated, amber partial,
+;              red not yet stopped), with a plain-English summary, what is being
+;              dropped, target ports, sources, learned patterns and any action
+;              you need to take (recommended)
+;   template - your own notification_template.json with {{placeholders}}
+discord_style = rich
+; Optional ping with each attack alert, e.g. @here, @everyone or a role as <@&ROLE_ID>.
+; The "attack ended" summary never pings.
+discord_mention =
 ; Plain text webhook for Slack, Microsoft Teams or Mattermost (optional).
 text_webhook_url =
 ; Send a summary when an attack ends.
@@ -1207,6 +1232,8 @@ def load_config(path=SETTINGS_FILE):
     cfg["flood_contributor_block_time"] = req(am, "flood_contributor_block_time", int, 600)
     cfg["enable_pattern_detection"] = req(am, "enable_pattern_detection", bool, True)
     cfg["block_autodetected_patterns"] = req(am, "block_autodetected_patterns", bool, False)
+    cfg["autodetect_enforce"] = req(am, "autodetect_enforce", bool, True)
+    cfg["autodetect_marker_pct"] = req(am, "autodetect_marker_pct", float, 85.0)
     cfg["autodetect_min_sources"] = req(am, "autodetect_min_sources", int, 5)
     cfg["autodetect_min_percent"] = req(am, "autodetect_min_percent", float, 15.0)
     cfg["autodetect_heavy_source_percent"] = req(am, "autodetect_heavy_source_percent", float, 20.0)
@@ -1256,6 +1283,8 @@ def load_config(path=SETTINGS_FILE):
     nt = "notification"
     cfg["webhook_url"] = req(nt, "webhook_url", str, "")
     cfg["text_webhook_url"] = req(nt, "text_webhook_url", str, "")
+    cfg["discord_style"] = (req(nt, "discord_style", str, "rich") or "rich").strip().lower()
+    cfg["discord_mention"] = (req(nt, "discord_mention", str, "") or "").strip()
     cfg["notify_on_end"] = req(nt, "notify_on_end", bool, True)
     cfg["notify_every_round"] = req(nt, "notify_every_round", bool, False)
     cfg["notify_script"] = req(nt, "notify_script", str, "")
@@ -1322,6 +1351,9 @@ def load_config(path=SETTINGS_FILE):
         errors.append("[advanced_mitigation] fragment_action must be off, ratelimit or drop")
     if cfg["carpet_action"] not in ("alert", "rtbh"):
         errors.append("[escalation] carpet_action must be alert or rtbh")
+    if cfg["discord_style"] not in ("rich", "template"):
+        errors.append(f"[notification] discord_style must be rich or template "
+                      f"(got {cfg['discord_style']!r})")
     if cfg["enable_api_integration"] and not cfg["api_endpoint"]:
         errors.append("[external_firewall] enable_api_integration is True but api_endpoint is empty")
     overlap = cfg["bypass_ports"] & cfg["service_ports"]
@@ -2519,6 +2551,7 @@ class Classification:
         self.frag_count = 0
         self.src_ttl = {}          # src -> stable ttl, or None if it varied
         self.dst_prefix_counts = Counter()  # dest /24|/64 -> count (carpet bombing)
+        self.unique_sources = 0    # distinct source addresses in the sample
 
     @property
     def categories(self):
@@ -2664,6 +2697,7 @@ def classify(packets, signatures, cfg, index=None, peer_nets=None):
     result.top_sources = [(ip, c, 100.0 * c / result.total)
                           for ip, c in src_counter.most_common(10)]
     result.top_dports = dport_counter.most_common(5)
+    result.unique_sources = len(src_counter)
     result.top_protos = proto_counter.most_common(5)
     result.proto_counts = proto_counter
     result.dport_counts = dport_counter
@@ -2975,13 +3009,15 @@ class NftFirewall(BaseFirewall):
                 if net is not None:
                     toks += [fam, dirn, str(net)]
         if pname in ("tcp", "udp"):
+            # nft needs the protocol keyword before EACH port match, so matching
+            # both ends is "udp sport X udp dport Y", not "udp sport X dport Y".
             fields = []
             if rule.sports:
-                fields += ["sport", self._portexpr(rule.sports)]
+                fields += [pname, "sport", self._portexpr(rule.sports)]
             if rule.dports:
-                fields += ["dport", self._portexpr(rule.dports)]
+                fields += [pname, "dport", self._portexpr(rule.dports)]
             if fields:
-                toks += [pname] + fields
+                toks += fields
             else:
                 toks += ["meta", "l4proto", pname]
             if rule.flags_value is not None and pname == "tcp":
@@ -5010,10 +5046,29 @@ def _dominant_length(pkts):
     return length, hits / len(pkts)
 
 
+def _dominant(values, floor):
+    """The most common non-None value and its share, or (None, share) if that
+    share is below `floor`. A value that dominates a field most traffic would vary
+    (source port, TTL, window, flags) is an attack fingerprint."""
+    vals = [v for v in values if v is not None]
+    if not vals:
+        return None, 0.0
+    val, hits = Counter(vals).most_common(1)[0]
+    frac = hits / len(vals)
+    return (val if frac >= floor else None), frac
+
+
 def autodetect_patterns(packets, classification, whitelist, cfg, known=None, baseline=None):
-    """known: set of learned real-client IPs (their packets are never signed).
-    baseline: {dport: set(4-byte prefixes)} seen from real clients in peacetime;
-    a pattern your own players send is never turned into a block."""
+    """Learn an attack's fingerprint when no built-in signature hard-drops it.
+
+    Looks at the whole packet, not just the payload: source port, TTL, TCP window,
+    DSCP, TCP flags, length and payload fragments. It builds the MOST SPECIFIC drop
+    rule that still covers the attack (for example "udp dport 9000 sport 6666
+    ttl 111"), so normal traffic on the same port, with a different TTL or window,
+    is never caught. A pattern becomes an enforced DROP only when it is a confirmed
+    bad actor: it dominates the attack across many sources (or a few heavy, stable
+    ones), it holds header fields that legitimate clients would vary, and it does
+    not match your learned real clients or peacetime baseline."""
     if not cfg["enable_pattern_detection"]:
         return []
     known = known or set()
@@ -5024,6 +5079,7 @@ def autodetect_patterns(packets, classification, whitelist, cfg, known=None, bas
     min_sources = cfg["autodetect_min_sources"]
     min_pct = cfg["autodetect_min_percent"]
     heavy_pct = cfg["autodetect_heavy_source_percent"]
+    marker = max(0.5, min(1.0, cfg.get("autodetect_marker_pct", 85) / 100.0))
     skip_ports = set(cfg.get("bypass_ports", set()))
 
     groups = defaultdict(list)
@@ -5039,53 +5095,106 @@ def autodetect_patterns(packets, classification, whitelist, cfg, known=None, bas
         if coverage < min_pct:
             continue
         srcs = {p["src"] for p in pkts if p.get("src") and not whitelist.is_protected(p["src"])}
-        # Per-source shares (for the heavy-source relaxation).
         src_counts = Counter(p["src"] for p in pkts if p.get("src"))
         heavy_srcs = {ip for ip, c in src_counts.items()
                       if 100.0 * c / total >= heavy_pct and not whitelist.is_protected(ip)}
         few_ok = 1 <= len(heavy_srcs) < min_sources
         if len(srcs) < min_sources and not few_ok:
             continue
-        payloads = [p["payload"] for p in pkts if p.get("payload")]
-        uniq_ratio = (len(set(payloads)) / len(payloads)) if payloads else 1.0
         pname = "tcp" if proto == 6 else "udp"
         eff_srcs = srcs if len(srcs) >= min_sources else heavy_srcs
+        payloads = [p["payload"] for p in pkts if p.get("payload")]
+        # If the dominant payload here is one your learned real clients send on
+        # this port, it is legitimate traffic: never fingerprint it (not by payload
+        # and not by its header fields either).
+        if baseline.get(dport):
+            pref, _ = _dominant([p[:4] for p in payloads if len(p) >= 4], marker)
+            if pref is not None and pref in baseline[dport]:
+                continue
+
+        # Header-field fingerprint: values this attack holds constant that normal
+        # traffic would vary across clients.
+        # One flow from one host trivially has a single source port, TTL and set of
+        # flags; that is not an attack fingerprint (a big upload or backup looks
+        # exactly like that). Only learn from traffic spread over several sources,
+        # and only count a header value that several DISTINCT sources share.
+        # Single heavy senders stay with the opt-in contributor/fallback blocking.
+        if len(eff_srcs) < 2:
+            continue
+        need_srcs = max(2, (len(eff_srcs) + 1) // 2)
+
+        def shared(key, val):
+            return len({p.get("src") for p in pkts
+                        if p.get(key) == val and p.get("src") in eff_srcs}) >= need_srcs
+
+        markers, reason = {}, []
+        sport, _ = _dominant([p.get("sport") for p in pkts], marker)
+        if sport is not None and shared("sport", sport):
+            markers["sport"] = sport; reason.append(f"sport {sport}")
+        ttl, _ = _dominant([p.get("ttl") for p in pkts], marker)
+        if ttl is not None and shared("ttl", ttl):
+            markers["ttl"] = ttl; reason.append(f"ttl {ttl}")
+        win, _ = _dominant([p.get("tcp_window") for p in pkts], marker)
+        if win and shared("tcp_window", win):
+            markers["tcp_window"] = win; reason.append(f"window {win}")
+        tos, _ = _dominant([p.get("tos") for p in pkts], marker)
+        if tos and shared("tos", tos):
+            markers["tos"] = tos; reason.append(f"dscp {tos >> 2}")
+        if proto == 6:
+            flg, _ = _dominant([p.get("flags") for p in pkts], marker)
+            # ACK / ACK+PSH / ACK+FIN are what every established connection sends;
+            # they say nothing about an attack, so never key on them.
+            if flg is not None and (flg & 0x3F) not in (0x10, 0x18, 0x11, 0x19) \
+                    and shared("flags", flg):
+                names = flag_value_to_names(flg)
+                if names:
+                    markers["tcp_flags"] = ",".join(names)
+                    reason.append("flags " + "|".join(names))
         gram = _dominant_ngram(pkts, eff_srcs, min(min_sources, len(eff_srcs)) if eff_srcs else min_sources,
                                exclude=baseline.get(dport, ()))
         rbyte = _repeated_byte(payloads)
-        length, lenfrac = _dominant_length(pkts)
-        # heavy/few-source detections are a real, small set -> blockable botnet;
-        # broad many-source detections stay spoof-safe udp_flood (pattern drop only)
-        cat = "botnet" if (few_ok and gram) else ("udp_flood" if proto == 17 else "tcp_flood")
         if gram:
-            detections.append({
-                "type": "payload", "label": f"Auto_frag_{gram.hex()}_{pname}{dport}",
-                "category": cat, "proto": pname, "payload_hex": gram.hex(),
-                "payload_offset": 0, "dport": dport, "source_ips": sorted(eff_srcs),
-                "coverage_pct": round(coverage, 1),
-                "block_time": cfg["autodetect_block_time"],
-                "reason": f"shared {len(gram)}-byte payload fragment across {len(eff_srcs)} sources"})
-        elif rbyte:
-            detections.append({
-                "type": "payload", "label": f"Auto_rbyte_{rbyte.hex()[:2]}_{pname}{dport}",
-                "category": "udp_flood" if proto == 17 else "tcp_flood",
-                "proto": pname, "payload_hex": rbyte.hex(), "payload_offset": 0,
-                "dport": dport, "source_ips": sorted(srcs), "coverage_pct": round(coverage, 1),
-                "reason": f"repeated-byte 0x{rbyte.hex()[:2]} flood"})
-        elif length and lenfrac >= 0.85 and uniq_ratio > 0.5:
-            detections.append({
-                "type": "length", "label": f"Auto_len{length}_{pname}{dport}",
-                "category": "udp_flood" if proto == 17 else "tcp_flood",
-                "proto": pname, "dport": dport, "min_len": length, "max_len": length,
-                "source_ips": sorted(srcs), "coverage_pct": round(coverage, 1),
-                "reason": f"{lenfrac*100:.0f}% identical {length}-byte packets"})
-    detections.sort(key=lambda d: d["coverage_pct"], reverse=True)
-    return detections[:3]
+            markers["payload_hex"], markers["payload_offset"] = gram.hex(), 0
+            reason.append(f"payload {gram.hex()}")
+        elif rbyte and len({p.get("src") for p in pkts if p.get("src") in eff_srcs
+                            and (p.get("payload") or b"")[:1] == rbyte[:1]
+                            and p["payload"] == rbyte[:1] * len(p["payload"])}) >= need_srcs:
+            markers["payload_hex"], markers["payload_offset"] = rbyte.hex(), 0
+            reason.append(f"repeated 0x{rbyte.hex()[:2]}")
+
+        # Fields normal traffic varies -> each dominant one is a real discriminator.
+        discriminators = sum(1 for k in ("sport", "ttl", "tcp_window", "tos",
+                                         "tcp_flags", "payload_hex") if k in markers)
+        length, lenfrac = _dominant_length(pkts)
+        fixed_len = length is not None and lenfrac >= marker and shared("len", length)
+        if fixed_len and (discriminators or lenfrac >= 0.95):
+            markers["min_len"] = markers["max_len"] = length
+            reason.append(f"len {length}")
+        if discriminators == 0 and not fixed_len:
+            continue   # nothing specific enough to key on; stays monitoring-only
+
+        confidence = "high" if (discriminators >= 2 or "payload_hex" in markers
+                                or (discriminators >= 1 and fixed_len)) else "medium"
+        # Many spoofed sources -> spoof-safe pattern drop. A few heavy, stable
+        # sources are a confirmed bad actor -> block them.
+        cat = ("botnet" if (few_ok and (discriminators or fixed_len))
+               else ("udp_flood" if proto == 17 else "tcp_flood"))
+        tag = "".join(ch for ch in "_".join(reason) if ch.isalnum() or ch == "_")[:40]
+        det = {"type": "composite", "label": f"Auto_{pname}{dport}_{tag}",
+               "category": cat, "proto": pname, "dport": dport,
+               "coverage_pct": round(coverage, 1), "confidence": confidence,
+               "source_ips": sorted(eff_srcs), "block_time": cfg["autodetect_block_time"],
+               "reason": ", ".join(reason)}
+        det.update(markers)
+        detections.append(det)
+    detections.sort(key=lambda d: (d["confidence"] == "high", d["coverage_pct"]), reverse=True)
+    return detections[:4]
 
 
 def _autodetect_key(entry):
     return (entry.get("type"), entry.get("payload_hex"), entry.get("proto"),
-            entry.get("dport"), entry.get("min_len"))
+            entry.get("dport"), entry.get("sport"), entry.get("ttl"),
+            entry.get("tcp_window"), entry.get("tcp_flags"), entry.get("min_len"))
 
 
 def save_autodetected(entry):
@@ -5467,33 +5576,198 @@ def send_discord(webhook_url, template, fields):
         return False
 
 
-def send_discord_end(webhook_url, summary):
-    """A short 'attack ended' embed (not the attack template with zeroed fields)."""
+# ---- rich alerts: Discord embeds and plain-text webhooks -------------------- #
+
+def _verdict_style(verdict, saturated=False):
+    """(emoji, embed colour, short label) for a mitigation verdict."""
+    v = str(verdict or "").lower()
+    if saturated or "saturated" in v:
+        return "\U0001F525", 0x8B0000, "Link saturated"
+    if v.startswith("mitigated") or "upstream mitigation active" in v:
+        return "\u2705", 0x2ECC71, "Mitigated"
+    if "partial" in v:
+        return "\U0001F7E0", 0xF39C12, "Partially mitigated"
+    if v.startswith("no drops") or v == "ongoing":
+        return "\U0001F534", 0xE74C3C, "Not yet mitigated"
+    if v.startswith("detected"):
+        return "\U0001F7E1", 0xF1C40F, "Detected"
+    return "\U0001F7E1", 0xF1C40F, (str(verdict) or "Unknown").capitalize()
+
+
+def _clip(text, limit=1024):
+    text = str(text) if text not in (None, "") else "n/a"
+    return text if len(text) <= limit else text[:limit - 3] + "..."
+
+
+def _now_iso():
+    return datetime.now().astimezone().isoformat(timespec="seconds")
+
+
+def build_discord_attack(report, new_vector=False, test=False):
+    """A Discord embed for an attack round, coloured by how well it is going."""
+    emoji, colour, label = _verdict_style(report["verdict"], report.get("saturated"))
+    title = f"{emoji} Attack #{report['attack_num']}: {label}"
+    if new_vector:
+        title += " (new attack type)"
+    if test:
+        title = "\U0001F9EA TEST ALERT | " + title
+    dropped, pct = report.get("dropped_pps"), report.get("dropped_pct")
+    if dropped is None:
+        mitigation = "No drop counters on this firewall backend"
+    else:
+        mitigation = (f"Dropping **{_fmt_int(dropped)}** pps" + (f" ({pct}%)" if pct is not None else "")
+                      + f"\nPassing {_fmt_int(report.get('passed_pps'))} pps")
+    ports = ", ".join(f"{p} ({pc}%)" for p, pc in report.get("top_ports", [])) or "n/a"
+    protos = ", ".join(f"{n} {pc}%" for n, pc in report.get("protocol_mix", [])) or "n/a"
+    vectors = [f"\u2022 **{m['name']}** {m['pct']}% \u00b7 {m['category']} \u00b7 "
+               f"{'real sources' if m['real_source'] else 'spoofed sources'}"
+               for m in report["matched"][:6]]
+    if len(report["matched"]) > 6:
+        vectors.append(f"\u2022 +{len(report['matched']) - 6} more (see the report)")
+    learned = [f"\u2022 `{l['label']}`\n{l['reason']} \u00b7 {l['confidence']} confidence \u00b7 "
+               f"{'**dropping**' if l['enforced'] else 'report only'}" for l in report["learned"][:3]]
+    real = any(m["real_source"] for m in report["matched"]) or report["blocked_ips"]
+    src = [f"{_fmt_int(report.get('unique_sources'))} unique \u00b7 {report.get('source_kind', '')}"]
+    if real:
+        src += [f"`{s['ip']}` {s['pct']}%" for s in report["top_sources"][:3]]
+    fields = [
+        {"name": "\U0001F4C8 Incoming", "inline": True,
+         "value": f"**{_fmt_int(report['pps'])}** pps\n**{report['mbps']}** Mbit/s\nCPU {report['cpu']}%"},
+        {"name": "\U0001F6E1\uFE0F Mitigation", "value": _clip(mitigation), "inline": True},
+        {"name": "\U0001F3AF Target", "inline": True,
+         "value": _clip(f"`{report['target_ip'] or 'n/a'}`\nPorts: {ports}\n{protos}")},
+        {"name": "\U0001F50E Attack vectors", "inline": False,
+         "value": _clip("\n".join(vectors) or "Unrecognised (no signature matched)")},
+    ]
+    if learned:
+        fields.append({"name": "\U0001F9E0 Learned pattern", "value": _clip("\n".join(learned)),
+                       "inline": False})
+    fields += [
+        {"name": "\U0001F310 Sources", "value": _clip("\n".join(src)), "inline": True},
+        {"name": "\U0001F6AB Blocked", "inline": True,
+         "value": f"{_fmt_int(len(report['blocked_ips']))} addresses "
+                  f"({_fmt_int(len(report['reflectors_blocked']))} reflectors)\n"
+                  f"{_fmt_int(len(report['blocked_nets']))} ranges"},
+        {"name": "\u2699\uFE0F Action taken", "value": _clip(report.get("strategy") or "monitoring only"),
+         "inline": False},
+    ]
+    if report.get("action_needed"):
+        fields.append({"name": "\u26A0\uFE0F Action needed", "inline": False,
+                       "value": _clip("\n".join(f"\u2022 {t}" for t in report["action_needed"]))})
+    if report.get("escalated"):
+        fields.append({"name": "\U0001F4E1 Upstream", "value": _clip(", ".join(report["escalated"])),
+                       "inline": False})
+    notes = [n for n in report.get("notes", []) if n]
+    if notes:
+        fields.append({"name": "\U0001F4DD Notes", "inline": False,
+                       "value": _clip("\n".join(f"\u2022 {n}" for n in notes[:6]))})
+    rep_line = f"`{report['report_file']}`" if report.get("report_file") else "n/a"
+    if _update_tag[0]:
+        rep_line += (f"\n[Update available: {_update_tag[0]}]"
+                     f"(https://github.com/0vm/NetDeflect/releases/latest)")
+    fields.append({"name": "\U0001F4C4 Report", "value": _clip(rep_line), "inline": False})
+    return {"title": _clip(title, 256), "description": _clip(report.get("summary", ""), 4000),
+            "url": "https://github.com/0vm/NetDeflect", "color": colour, "fields": fields[:25],
+            "footer": {"text": f"NetDeflect v{VERSION} \u00b7 {report.get('hostname', '')}"},
+            "timestamp": _now_iso()}
+
+
+def build_discord_end(summary):
+    mins, secs = divmod(int(summary["duration"]), 60)
+    emoji, _c, label = _verdict_style(summary.get("final_verdict"))
+    mbit = round(summary["peak_mbps"] * 8, 1)
+    ports = summary.get("top_ports") or []
+    fields = [
+        {"name": "\u23F1\uFE0F Duration", "value": f"{mins}m {secs}s", "inline": True},
+        {"name": "\U0001F4C8 Peak", "value": f"{_fmt_int(summary['peak_pps'])} pps\n{mbit} Mbit/s",
+         "inline": True},
+        {"name": "\U0001F6E1\uFE0F Peak dropped", "value": f"{_fmt_int(summary.get('peak_dropped_pps'))} pps",
+         "inline": True},
+        {"name": "\U0001F50E Attack types", "inline": False,
+         "value": _clip("\n".join(f"\u2022 {v}" for v in summary.get("vector_list") or [])
+                        or "Unrecognised")},
+        {"name": "\U0001F3AF Target", "inline": True,
+         "value": _clip(f"`{summary.get('target_ip') or 'n/a'}`"
+                        + (f"\nPorts: {', '.join(map(str, ports))}" if ports else ""))},
+        {"name": "\U0001F6AB Blocked", "value": f"{_fmt_int(summary['total_blocked'])} addresses/ranges",
+         "inline": True},
+        {"name": "\U0001F501 Rounds", "value": f"{summary.get('rounds', 0)} mitigation round(s)",
+         "inline": True},
+        {"name": "\U0001F552 Time", "inline": True,
+         "value": f"<t:{summary['started']}:T> to <t:{summary['ended']}:T>"},
+        {"name": "\U0001F3C1 Final result", "value": f"{emoji} {label}" if summary.get("final_verdict")
+                                                    else "n/a", "inline": True},
+    ]
+    if summary.get("pulse_wave"):
+        fields.append({"name": "\u3030\uFE0F Pattern", "inline": False,
+                       "value": f"Pulse wave ({summary.get('bursts', 0)} bursts). Protection was "
+                                f"held through the quiet gaps."})
+    return {"title": f"\u2705 Attack #{summary['attack_id']} ended", "color": 0x2ECC71,
+            "description": f"Lasted {mins}m {secs}s and peaked at {_fmt_int(summary['peak_pps'])} pps "
+                           f"({mbit} Mbit/s).",
+            "fields": fields, "footer": {"text": f"NetDeflect v{VERSION} \u00b7 {socket.gethostname()}"},
+            "timestamp": _now_iso()}
+
+
+def build_text_alert(report, new_vector=False):
+    """The same alert as plain multi-line text for Slack, Teams or Mattermost."""
+    emoji, _c, label = _verdict_style(report["verdict"], report.get("saturated"))
+    lines = [f"{emoji} NetDeflect | Attack #{report['attack_num']} on {report.get('hostname', '')}: "
+             f"{label}" + (" (new attack type)" if new_vector else ""),
+             report.get("summary", "")]
+    vec = "; ".join(f"{m['name']} {m['pct']}% ({'real' if m['real_source'] else 'spoofed'})"
+                    for m in report["matched"][:4]) or "unrecognised"
+    lines.append(f"Vectors: {vec}")
+    for l in report["learned"][:2]:
+        lines.append(f"Learned: {l['label']} ({l['reason']}; "
+                     f"{'dropping' if l['enforced'] else 'report only'})")
+    d = report.get("dropped_pps")
+    lines.append(f"Incoming: {_fmt_int(report['pps'])} pps / {report['mbps']} Mbit/s"
+                 + (f" | Dropping {_fmt_int(d)} pps ({report.get('dropped_pct')}%) | "
+                    f"Passing {_fmt_int(report.get('passed_pps'))} pps" if d is not None else ""))
+    ports = ", ".join(f"{p} ({pc}%)" for p, pc in report.get("top_ports", []))
+    lines.append(f"Target: {report['target_ip'] or 'n/a'}" + (f" ports {ports}" if ports else ""))
+    lines.append(f"Sources: {_fmt_int(report.get('unique_sources'))} unique, "
+                 f"{report.get('source_kind', '')} | Blocked: {len(report['blocked_ips'])} addresses, "
+                 f"{len(report['blocked_nets'])} ranges")
+    lines.append(f"Action taken: {report.get('strategy') or 'monitoring only'}")
+    lines += [f"Action needed: {t}" for t in report.get("action_needed", [])]
+    if report.get("report_file"):
+        lines.append(f"Report: {report['report_file']}")
+    return "\n".join(l for l in lines if l)
+
+
+def build_text_end(summary):
+    mins, secs = divmod(int(summary["duration"]), 60)
+    return (f"\u2705 NetDeflect | Attack #{summary['attack_id']} ended after {mins}m {secs}s\n"
+            f"Peak: {_fmt_int(summary['peak_pps'])} pps / {round(summary['peak_mbps'] * 8, 1)} Mbit/s"
+            f" | Peak dropped: {_fmt_int(summary.get('peak_dropped_pps'))} pps"
+            f" | Blocked: {_fmt_int(summary['total_blocked'])}\n"
+            f"Attack types: {summary['vectors']}"
+            + ("\nPattern: pulse wave" if summary.get("pulse_wave") else ""))
+
+
+def send_discord_embed(webhook_url, embed, mention=""):
     if not webhook_url or "CHANGE-ME" in webhook_url:
         return False
     import requests
-    mins, secs = divmod(int(summary["duration"]), 60)
-    embed = {"embeds": [{
-        "title": f"Attack #{summary['attack_id']} ended",
-        "color": 3066993,
-        "fields": [
-            {"name": "Duration", "value": f"{mins}m {secs}s", "inline": True},
-            {"name": "Peak", "value": f"{summary['peak_pps']} pps / "
-                                       f"{round(summary['peak_mbps'] * 8, 1)} Mbit/s", "inline": True},
-            {"name": "Blocked", "value": str(summary["total_blocked"]), "inline": True},
-            {"name": "Attack types", "value": str(summary["vectors"])[:1000] or "unclassified",
-             "inline": False},
-        ],
-        "footer": {"text": "NetDeflect"}}]}
-    if summary.get("pulse_wave"):
-        embed["embeds"][0]["fields"].append({"name": "Pattern", "value": "pulse wave (repeated bursts)",
-                                             "inline": False})
+    payload = {"embeds": [embed],
+               "allowed_mentions": {"parse": ["everyone", "roles", "users"] if mention else []}}
+    if mention:
+        payload["content"] = mention
     try:
-        r = requests.post(webhook_url, json=embed, timeout=5)
+        r = requests.post(webhook_url, json=payload, timeout=5)
+        if r.status_code >= 300:
+            log.warning("Discord webhook returned %s: %s", r.status_code, r.text[:200])
         return r.status_code < 300
     except Exception as exc:  # noqa: BLE001
         log.warning("Discord webhook failed: %s", exc)
         return False
+
+
+def send_discord_end(webhook_url, summary):
+    """The 'attack ended' summary embed."""
+    return send_discord_embed(webhook_url, build_discord_end(summary))
 
 
 def send_text_webhook(url, text):
@@ -5614,6 +5888,25 @@ def get_timestamp():
 
 def get_display_time():
     return datetime.now().strftime("%H:%M:%S")
+
+
+class TerminalColor:
+    """ANSI colours for the live status screen (the classic NetDeflect look)."""
+    RESET = "\033[0m"
+    BOLD = "\033[1m"
+    RED = "\033[91m"
+    GREEN = "\033[92m"
+    YELLOW = "\033[93m"
+    BLUE = "\033[94m"
+    MAGENTA = "\033[95m"
+    CYAN = "\033[96m"
+    WHITE = "\033[97m"
+    GREY = "\033[90m"
+
+
+def get_output_prefix():
+    return (f"{TerminalColor.WHITE}[{TerminalColor.RED}NetDeflect{TerminalColor.WHITE}]"
+            f"{TerminalColor.RESET} ")
 
 
 class _ColourFormatter(logging.Formatter):
@@ -5811,6 +6104,13 @@ class AttackTracker:
         self.peak_mbps = mbps
         self.total_blocked = 0
         self.sigs_seen = set()
+        self.learned_seen = set()
+        self.rounds = 0
+        self.peak_dropped = 0
+        self.last_verdict = ""
+        self.target = ""
+        self.ports = Counter()
+        self.max_sources = 0
         self.pulse = False
         self.quiet_seen = True     # the first round of an attack is a burst
         self.quiet_since = None
@@ -5845,9 +6145,18 @@ class AttackTracker:
                             "mitigation through the gaps", len(self.crossings))
             self.pulse = True
 
-    def update(self, result, sig_names):
+    def update(self, result, sig_names, report=None):
         self.total_blocked += len(result.blocked_ips) + len(result.blocked_nets)
         self.sigs_seen.update(sig_names)
+        self.learned_seen.update(d["label"] for d in result.autodetected)
+        self.rounds = getattr(self, "rounds", 0) + 1
+        if report:
+            self.peak_dropped = max(getattr(self, "peak_dropped", 0), report.get("dropped_pps") or 0)
+            self.last_verdict = report.get("verdict") or ""
+            self.target = report.get("target_ip") or getattr(self, "target", "")
+            self.max_sources = max(getattr(self, "max_sources", 0), report.get("unique_sources") or 0)
+            for port, pct in report.get("top_ports", []):
+                self.ports[port] += pct
 
     def should_end(self, cfg):
         if not self.active:
@@ -5859,11 +6168,22 @@ class AttackTracker:
 
     def end(self):
         duration = int(time.time() - self.start) if self.start else 0
+        learned = sorted(getattr(self, "learned_seen", set()))
+        vectors = sorted(self.sigs_seen) + [f"{l} (learned)" for l in learned]
+        ports = getattr(self, "ports", Counter())
         summary = {"attack_id": self.attack_id, "duration": duration,
                    "peak_pps": self.peak_pps, "peak_mbps": round(self.peak_mbps, 1),
                    "total_blocked": self.total_blocked,
-                   "vectors": ", ".join(sorted(self.sigs_seen)) or "unclassified",
-                   "pulse_wave": self.pulse}
+                   "vectors": ", ".join(vectors) or "unclassified",
+                   "vector_list": vectors, "pulse_wave": self.pulse,
+                   "started": int(self.start or time.time()), "ended": int(time.time()),
+                   "rounds": getattr(self, "rounds", 0),
+                   "peak_dropped_pps": getattr(self, "peak_dropped", 0),
+                   "final_verdict": getattr(self, "last_verdict", ""),
+                   "target_ip": getattr(self, "target", ""),
+                   "top_ports": [p for p, _ in ports.most_common(3)],
+                   "max_sources": getattr(self, "max_sources", 0),
+                   "bursts": len(self.crossings)}
         log.warning("=== Attack #%d ended after %ds (peak %d pps / %.1f MB/s, %d blocked%s) ===",
                     self.attack_id, duration, self.peak_pps, self.peak_mbps,
                     self.total_blocked, ", pulse-wave" if self.pulse else "")
@@ -5875,13 +6195,150 @@ class AttackTracker:
 #  Reporting
 # --------------------------------------------------------------------------- #
 
+def _dash_attack(report):
+    """Attack and drop-rate lines for the live status screen."""
+    if not report:
+        return {}
+    vec = (report["matched"][0]["name"] if report["matched"]
+           else (report["learned"][0]["label"] if report["learned"] else "unrecognised"))
+    out = {"attack": f"#{report['attack_num']} {vec}"}
+    if report.get("dropped_pps") is not None:
+        out["dropping"] = f"{_fmt_int(report['dropped_pps'])} pps ({report.get('dropped_pct')}%)"
+    return out
+
+
+def sample_report(cfg):
+    """A realistic example attack for --test-webhook previews (clearly marked TEST)."""
+    r = {"attack_num": 0, "attack_id": "0-test", "timestamp": datetime.now().isoformat(timespec="seconds"),
+         "target_ip": "203.0.113.10", "target_port": 53, "pps": 182450, "mbps": 1402.6, "cpu": 4,
+         "verdict": "mitigated", "dropped_pps": 179880, "passed_pps": 2570, "saturated": False,
+         "attack_vector": "DNS Reflection", "attack_category": "reflection",
+         "matched": [{"name": "DNS Reflection", "category": "reflection", "pct": 97.4,
+                      "real_source": True}],
+         "top_sources": [{"ip": "198.51.100.23", "pct": 2.1}, {"ip": "198.51.100.87", "pct": 1.9},
+                         {"ip": "192.0.2.44", "pct": 1.6}],
+         "blocked_ips": ["198.51.100.23"] * 412, "blocked_nets": ["198.51.100.0/24"],
+         "reflectors_blocked": ["198.51.100.23"] * 412, "spoofed_spared": [],
+         "escalated": [], "notes": ["This is a test alert from --test-webhook. No attack is running."],
+         "near_misses": [], "hostname": socket.gethostname(), "unique_sources": 431,
+         "top_ports": [(53, 98), (443, 1)], "protocol_mix": [("UDP", 99), ("TCP", 1)],
+         "dropped_pct": 99, "learned": [], "report_file": "example.attack0.txt",
+         "strategy": "1 attack pattern(s) dropped; 412 address(es) blocked, 412 of them "
+                     "reflectors; 1 range(s) blocked"}
+    r["source_kind"] = _source_kind(r)
+    r["summary"] = _summary_sentence(r)
+    r["action_needed"] = _action_needed(r, dict(cfg, dry_run=False))
+    return r
+
+
+def _fmt_int(n):
+    try:
+        return f"{int(n):,}"
+    except (TypeError, ValueError):
+        return "n/a"
+
+
+_PROTO_LABEL = {6: "TCP", 17: "UDP", 1: "ICMP", 58: "ICMPv6", 47: "GRE", 50: "ESP"}
+
+
+def _proto_mix(classification):
+    total = sum(classification.proto_counts.values()) or 1
+    return [(_PROTO_LABEL.get(p, str(proto_name(p)).upper()), round(100.0 * c / total))
+            for p, c in classification.proto_counts.most_common(3)]
+
+
+def _top_ports(classification):
+    total = sum(classification.dport_counts.values()) or 1
+    return [(p, round(100.0 * c / total)) for p, c in classification.top_dports[:3]]
+
+
+def _source_kind(report):
+    if any(m["real_source"] for m in report["matched"]) or report["blocked_ips"]:
+        return "real (reflectors or bots)"
+    n = report.get("unique_sources") or 0
+    if n >= 50:
+        return "likely spoofed"
+    return f"{n} host(s)"
+
+
+def _summary_sentence(report):
+    """One plain-English line: what is hitting the server and what NetDeflect did."""
+    if report["matched"]:
+        vec = report["matched"][0]["name"]
+        if len(report["matched"]) > 1:
+            vec += f" (+{len(report['matched']) - 1} more)"
+    elif report["learned"]:
+        vec = "An unrecognised flood (pattern learned)"
+    else:
+        vec = "An unrecognised flood"
+    where = report["target_ip"] or "this server"
+    if report["target_port"] not in ("", None):
+        where += f" port {report['target_port']}"
+    s = f"{vec} against {where}."
+    dropped = report.get("dropped_pps")
+    if dropped:
+        pct = report.get("dropped_pct")
+        s += f" Dropping {_fmt_int(dropped)} pps" + \
+             (f" ({pct}% of incoming)" if pct is not None else "") + " in the kernel."
+    elif str(report.get("verdict", "")).startswith("upstream"):
+        s += " Mitigation has been sent upstream."
+    else:
+        s += " Nothing is being dropped yet."
+    nb, nn = len(report["blocked_ips"]), len(report["blocked_nets"])
+    if nb or nn:
+        s += f" Blocked {_fmt_int(nb)} address(es)" + (f" and {nn} range(s)" if nn else "") + "."
+    elif (report.get("unique_sources") or 0) >= 50 and \
+            not any(m["real_source"] for m in report["matched"]):
+        s += " The sources look spoofed, so no addresses were blocked."
+    return s
+
+
+def _action_needed(report, cfg):
+    """Plain advice for the operator when NetDeflect cannot fully handle it."""
+    tips = []
+    port = report["target_port"]
+    has_port = port not in ("", None)
+    if report.get("saturated"):
+        tips.append("Your link or network card is full. Filtering on this server cannot fix "
+                    "that: ask your host for upstream filtering, or set up [escalation] BGP.")
+    enforced = any(l["enforced"] for l in report["learned"])
+    acting = [m for m in report["matched"] if m.get("strategy", "filter") != "report"]
+    handled = bool(acting) or enforced
+    report_only = [m["name"] for m in report["matched"] if m.get("strategy") == "report"]
+    if report_only and not handled:
+        tips.append(f"Detected {', '.join(report_only[:3])}, but with your current settings it "
+                    "can only be reported, not dropped. See Notes for the setting that enables "
+                    "dropping it.")
+    elif not handled:
+        if has_port and port in cfg.get("service_ports", set()):
+            tips.append(f"Unrecognised flood with no stable fingerprint. Port {port} is in "
+                        "[services], so lockdown limits unknown sources and real players go first.")
+        else:
+            tips.append("Unrecognised flood with no stable fingerprint, so nothing is being "
+                        "dropped. " + (f"If port {port} is your game or VPN port, add it to "
+                                       "[services] ports so lockdown protects it. " if has_port else "")
+                        + "Otherwise ask your host for upstream filtering.")
+        if report["learned"]:
+            tips.append("A lower-confidence pattern was learned and is report-only. Review "
+                        "new_detected_methods.json, or set block_autodetected_patterns = True.")
+    pct = report.get("dropped_pct")
+    if handled and report.get("dropped_pps") and pct is not None and pct < 50 \
+            and not report.get("saturated"):
+        tips.append("Under half of incoming traffic is being dropped. Check the report for a "
+                    "second vector or near misses.")
+    if cfg.get("dry_run"):
+        tips.append("Watch-only mode is on, so nothing is being blocked "
+                    "(set [firewall] enable_ban = True).")
+    return tips
+
+
 def build_report(cfg, tracker, pre, eff, classification, result, whitelist):
     import uuid
     target_port = classification.top_dports[0][0] if classification.top_dports else ""
     vectors = classification.signature_names[:]
     for det in result.autodetected:
         vectors.append(f"{det['label']} (auto)")
-    return {
+    report = {
         "attack_id": f"{tracker.attack_id}-{uuid.uuid4().hex[:8]}",
         "attack_num": tracker.attack_id,
         "timestamp": datetime.now().isoformat(timespec="seconds"),
@@ -5894,7 +6351,8 @@ def build_report(cfg, tracker, pre, eff, classification, result, whitelist):
         "attack_vector": ", ".join(classification.signature_names) or "Unclassified",
         "attack_category": ", ".join(sorted(classification.categories)) or "Unknown",
         "matched": [{"name": s.name, "category": s.category, "pct": round(p, 1),
-                     "real_source": s.real_source} for s, c, p in classification.matched],
+                     "real_source": s.real_source, "strategy": s.strategy}
+                    for s, c, p in classification.matched],
         "top_sources": [{"ip": ip, "pct": round(p, 1)} for ip, c, p in classification.top_sources[:10]],
         "blocked_ips": result.blocked_ips, "blocked_nets": result.blocked_nets,
         "reflectors_blocked": result.reflectors_blocked,
@@ -5903,6 +6361,23 @@ def build_report(cfg, tracker, pre, eff, classification, result, whitelist):
         "escalated": result.escalated, "notes": result.notes,
         "near_misses": [{"name": n, "pct": round(p, 1)} for n, c, p in classification.near_misses],
     }
+    dropped, passed = eff.get("dropped_pps"), eff.get("passed_pps")
+    report.update({
+        "hostname": socket.gethostname(),
+        "unique_sources": getattr(classification, "unique_sources", 0),
+        "top_ports": _top_ports(classification),
+        "protocol_mix": _proto_mix(classification),
+        "dropped_pct": (round(100.0 * dropped / max(dropped + (passed or 0), 1))
+                        if dropped is not None else None),
+        "strategy": getattr(result, "strategy", ""),
+        "learned": [{"label": d["label"], "reason": d.get("reason", ""),
+                     "confidence": d.get("confidence", ""), "enforced": bool(d.get("enforced")),
+                     "coverage_pct": d.get("coverage_pct")} for d in result.autodetected],
+    })
+    report["source_kind"] = _source_kind(report)
+    report["summary"] = _summary_sentence(report)
+    report["action_needed"] = _action_needed(report, cfg)
+    return report
 
 
 def write_report_files(cfg, report, classification, eff):
@@ -5914,6 +6389,9 @@ def write_report_files(cfg, report, classification, eff):
         f"Attack ID : {report['attack_id']}",
         f"Time      : {report['timestamp']}",
         f"Target    : {report['target_ip']}  port {report['target_port']}",
+        f"Host      : {report.get('hostname', '')}",
+        "",
+        f"Summary   : {report.get('summary', '')}",
         "",
         "Pre-mitigation:",
         f"  PPS            : {report['pps']}",
@@ -5954,6 +6432,14 @@ def write_report_files(cfg, report, classification, eff):
         lines.append(f"  Upstream RTBH  : {', '.join(report['escalated'])}")
     for note in report["notes"]:
         lines.append(f"  Note           : {note}")
+    lines += ["", f"Sources: {report.get('unique_sources', 0)} unique ({report.get('source_kind', '')})",
+              "Ports  : " + (", ".join(f"{p} ({pc}%)" for p, pc in report.get("top_ports", [])) or "n/a"),
+              "Protos : " + (", ".join(f"{n} {pc}%" for n, pc in report.get("protocol_mix", [])) or "n/a")]
+    for l in report.get("learned", []):
+        lines.append(f"Learned: {l['label']} ({l['reason']}; {l['confidence']} confidence; "
+                     f"{'dropping' if l['enforced'] else 'report only'})")
+    if report.get("action_needed"):
+        lines += ["", "Action needed:"] + [f"  - {tip}" for tip in report["action_needed"]]
     try:
         with open(path, "w", encoding="utf-8") as fh:
             fh.write("\n".join(lines) + "\n")
@@ -6121,26 +6607,39 @@ class Dashboard:
         self.last_log = 0
         self.last_draw = 0
 
+    @staticmethod
+    def _row(label, value, colour=TerminalColor.RED):
+        return (f"{get_output_prefix()}{label:>21}: {TerminalColor.WHITE}["
+                f"{colour}{value}{TerminalColor.WHITE}]{TerminalColor.RESET}")
+
     def render(self, state):
         now = time.time()
         if self.on and self.tty:
             if now - self.last_draw < self.interval:
                 return
             self.last_draw = now
-            lines = [
-                f"  {VERSION_STRING}   {get_display_time()}",
-                f"  interface   : {state.get('iface', '-')}",
-                f"  public IP   : {state.get('ip') or '-'}",
-                f"  CPU         : {state.get('cpu', 0)}%",
-                f"  packets/s   : {state.get('pps', 0)}",
-                f"  Mbit/s      : {round(state.get('mbps', 0) * 8, 1)}",
-                f"  blocked     : {state.get('blocked', 0)}",
-                f"  learned     : {state.get('known', 0)} clients",
-                f"  status      : {state.get('status', 'monitoring')}",
+            C = TerminalColor
+            status = state.get("status", "monitoring")
+            mitigating = status not in ("monitoring", "watching")
+            scolour = C.RED if mitigating else C.GREEN
+            rows = [
+                f"{get_output_prefix()}{C.BOLD}{VERSION_STRING}{C.RESET}   {C.GREY}{get_display_time()}{C.RESET}",
+                self._row("Interface", state.get("iface", "-"), C.CYAN),
+                self._row("IP Address", state.get("ip") or "-"),
+                self._row("CPU", f"{state.get('cpu', 0)}%"),
+                self._row("MB/s", round(state.get("mbps", 0), 2)),
+                self._row("Packets Per Second", state.get("pps", 0)),
+                self._row("Blocked", state.get("blocked", 0)),
+                self._row("Learned Clients", state.get("known", 0)),
+                self._row("Status", status, scolour),
             ]
+            if mitigating and state.get("attack"):
+                rows.append(self._row("Attack", state["attack"], C.YELLOW))
+            if mitigating and state.get("dropping"):
+                rows.append(self._row("Dropping", state["dropping"], C.GREEN))
             if _update_tag[0]:
-                lines.append(f"  update      : {_update_tag[0]} is available")
-            sys.stdout.write("\033[2J\033[H" + "\n".join(lines) + "\n")
+                rows.append(self._row("Update", f"{_update_tag[0]} available", C.YELLOW))
+            sys.stdout.write("\033[2J\033[H" + "\n".join(rows) + "\n")
             sys.stdout.flush()
         elif now - self.last_log >= max(self.interval, 60):
             self.last_log = now
@@ -6234,31 +6733,48 @@ def run_cycle(cfg, ctx, nic_pps, nic_mbps, cpu0, packets=None):
 
     result = plan_and_mitigate(fw, classification, cfg, whitelist)
 
-    if not classification.matched:
+    # Run pattern learning when no built-in signature actually HARD-DROPS the
+    # traffic: either nothing matched, or only weak rate limits did (so a generic
+    # SYN flood that is merely rate-limited still gets a real drop rule).
+    hard = {sig.strategy for sig, _, _ in classification.matched} & {"filter", "block_src"}
+    if not hard:
         for det in autodetect_patterns(packets, classification, whitelist, cfg,
                                        known=learner.known_set(), baseline=learner.baseline):
             is_new = save_autodetected(det)
-            log.info("Learned pattern %s (%s), %.1f%% of traffic (%s)", det["label"],
-                     det.get("reason", det["type"]), det["coverage_pct"],
-                     "new" if is_new else "seen before")
+            log.info("Learned pattern %s [%s] (%s), %.1f%% of traffic (%s)", det["label"],
+                     det.get("confidence", "?"), det.get("reason", det["type"]),
+                     det["coverage_pct"], "new" if is_new else "seen before")
             result.autodetected.append(det)
-            if not cfg["block_autodetected_patterns"]:
+            # A high-confidence composite is a confirmed bad actor: enforce it
+            # automatically (spoof-safe pattern drop). Lower confidence still waits
+            # for block_autodetected_patterns.
+            enforce = (det.get("confidence") == "high" and cfg.get("autodetect_enforce", True))
+            if not (enforce or cfg["block_autodetected_patterns"]):
                 continue
             try:
                 sig = Signature(name=det["label"], category=det["category"],
                                 proto=det.get("proto", "udp"), dport=det.get("dport"),
+                                sport=det.get("sport"), tcp_flags=det.get("tcp_flags"),
+                                ttl_min=det.get("ttl"), ttl_max=det.get("ttl"),
+                                tos=det.get("tos"), tcp_window=det.get("tcp_window"),
                                 payload_hex=det.get("payload_hex"),
                                 payload_offset=det.get("payload_offset"),
                                 min_len=det.get("min_len"), max_len=det.get("max_len"),
-                                block_time=det.get("block_time"))
+                                action="drop", block_time=det.get("block_time"))
             except ValueError:
                 continue
             if det["category"] == "botnet" and det.get("source_ips"):
                 targets = [ip for ip in det["source_ips"][:1024] if not whitelist.is_protected(ip)]
                 result.blocked_ips += fw.block_many(targets, det.get("block_time"))
-                log.info("Learned pattern %s: blocked %d real sources", det["label"], len(targets))
+                result.filters_applied.append(f"{det['label']} (learned)")
+                fw.apply_filter(FilterRule(sig, cfg))
+                det["enforced"] = True
+                log.warning("Confirmed attacker pattern %s: dropping it and blocking %d "
+                            "real source(s)", det["label"], len(targets))
             elif fw.apply_filter(FilterRule(sig, cfg)):
                 result.filters_applied.append(f"{det['label']} (learned)")
+                det["enforced"] = True
+                log.warning("Enforcing learned drop rule %s (%s)", det["label"], det.get("reason"))
         result.dedup()
 
     if cfg["carpet_pps_threshold"] > 0:
@@ -6299,12 +6815,6 @@ def run_cycle(cfg, ctx, nic_pps, nic_mbps, cpu0, packets=None):
             for ip in fresh:
                 sent[ip] = exp
 
-    pre = {"pps": nic_pps, "mbps": nic_mbps, "cpu": int(cpu0)}
-    report = build_report(cfg, tracker, pre, eff, classification, result, whitelist)
-    report_path = write_report_files(cfg, report, classification, eff)
-    write_ip_list(cfg, report, classification, result)
-    tracker.update(result, classification.signature_names)
-
     strategy = []
     if result.filters_applied:
         strategy.append(f"{len(result.filters_applied)} attack pattern(s) dropped")
@@ -6319,25 +6829,48 @@ def run_cycle(cfg, ctx, nic_pps, nic_mbps, cpu0, packets=None):
     if result.escalated:
         strategy.append("upstream blackhole: " + ", ".join(result.escalated))
     strategy_str = "; ".join(strategy) or "monitoring only"
+    result.strategy = strategy_str
+
+    pre = {"pps": nic_pps, "mbps": nic_mbps, "cpu": int(cpu0)}
+    report = build_report(cfg, tracker, pre, eff, classification, result, whitelist)
+    report_path = write_report_files(cfg, report, classification, eff)
+    report["report_file"] = os.path.basename(report_path)
+    write_ip_list(cfg, report, classification, result)
+    tracker.update(result, classification.signature_names, report)
+    ctx["last_report"] = report
+    log.warning("Attack #%d: %s", report["attack_num"], report["summary"])
+    for tip in report["action_needed"]:
+        log.warning("Action needed: %s", tip)
 
     vectors = set(classification.signature_names) | {d["label"] for d in result.autodetected}
     new_vectors = vectors - ctx.get("notified_vectors", set())
     if first_round or new_vectors or cfg["notify_every_round"]:
         ctx.setdefault("notified_vectors", set()).update(vectors)
-        fields = {
-            "attack_id": report["attack_num"], "pps": nic_pps,
-            "mbps": round(nic_mbps * 8, 1), "cpu": f"{int(cpu0)}%",
-            "status": eff["verdict"], "dropped_pps": eff["dropped_pps"],
-            "passed_pps": eff["passed_pps"], "block_count": len(result.blocked_ips),
-            "net_count": len(result.blocked_nets), "target_ip": report["target_ip"],
-            "target_port": report["target_port"], "attack_vector": report["attack_vector"],
-            "attack_category": report["attack_category"], "blocking_strategy": strategy_str,
-            "report_file": os.path.basename(report_path) + (f"\n\n[Update available: {_update_tag[0]}](https://github.com/0vm/NetDeflect/releases/latest)" if _update_tag[0] else ""),
-        }
-        send_discord(cfg["webhook_url"], ctx["template"], fields)
-        send_text_webhook(cfg["text_webhook_url"],
-                          f"NetDeflect attack #{report['attack_num']}: {fields['attack_vector']} | "
-                          f"{strategy_str} | {eff['verdict']}")
+        is_new = bool(new_vectors) and not first_round
+        if cfg.get("discord_style", "rich") == "template":
+            fields = {
+                "attack_id": report["attack_num"], "pps": nic_pps,
+                "mbps": round(nic_mbps * 8, 1), "cpu": f"{int(cpu0)}%",
+                "status": eff["verdict"], "dropped_pps": eff["dropped_pps"],
+                "passed_pps": eff["passed_pps"], "block_count": len(result.blocked_ips),
+                "net_count": len(result.blocked_nets), "target_ip": report["target_ip"],
+                "target_port": report["target_port"], "attack_vector": report["attack_vector"],
+                "attack_category": report["attack_category"], "blocking_strategy": strategy_str,
+                "summary": report["summary"],
+                "action_needed": " ".join(report["action_needed"]) or "none",
+                "unique_sources": report["unique_sources"], "source_kind": report["source_kind"],
+                "dropped_pct": report["dropped_pct"], "hostname": report["hostname"],
+                "top_ports": ", ".join(f"{p} ({pc}%)" for p, pc in report["top_ports"]),
+                "protocol_mix": ", ".join(f"{n} {pc}%" for n, pc in report["protocol_mix"]),
+                "report_file": report["report_file"] + (
+                    f"\n\n[Update available: {_update_tag[0]}](https://github.com/0vm/NetDeflect/releases/latest)"
+                    if _update_tag[0] else ""),
+            }
+            send_discord(cfg["webhook_url"], ctx["template"], fields)
+        else:
+            send_discord_embed(cfg["webhook_url"], build_discord_attack(report, new_vector=is_new),
+                               cfg.get("discord_mention", ""))
+        send_text_webhook(cfg["text_webhook_url"], build_text_alert(report, new_vector=is_new))
         run_notify_script(cfg, "attack", report)
     write_event_log(cfg, report)
 
@@ -6857,12 +7390,22 @@ def main():
 
     template = load_notification_template()
     if args.test_webhook:
-        ok = send_discord(cfg["webhook_url"], template, {
-            "attack_id": 0, "pps": 0, "mbps": 0, "cpu": "0%", "status": "test",
-            "dropped_pps": 0, "passed_pps": 0, "block_count": 0, "net_count": 0,
-            "target_ip": "-", "target_port": "-", "attack_vector": "Test alert",
-            "attack_category": "test", "blocking_strategy": "none", "report_file": "n/a"})
-        ok2 = send_text_webhook(cfg["text_webhook_url"], "NetDeflect test alert")
+        sample = sample_report(cfg)
+        if cfg["discord_style"] == "template":
+            ok = send_discord(cfg["webhook_url"], template, {
+                "attack_id": 0, "pps": sample["pps"], "mbps": sample["mbps"], "cpu": "4%",
+                "status": "test", "dropped_pps": sample["dropped_pps"],
+                "passed_pps": sample["passed_pps"], "block_count": 0, "net_count": 0,
+                "target_ip": sample["target_ip"], "target_port": sample["target_port"],
+                "attack_vector": "Test alert", "attack_category": "test",
+                "blocking_strategy": sample["strategy"], "summary": sample["summary"],
+                "action_needed": "none", "unique_sources": sample["unique_sources"],
+                "source_kind": sample["source_kind"], "dropped_pct": sample["dropped_pct"],
+                "hostname": sample["hostname"], "top_ports": "53 (98%)",
+                "protocol_mix": "UDP 99%", "report_file": "n/a"})
+        else:
+            ok = send_discord_embed(cfg["webhook_url"], build_discord_attack(sample, test=True))
+        ok2 = send_text_webhook(cfg["text_webhook_url"], build_text_alert(sample))
         print("Discord:", "sent" if ok else "not sent (check webhook_url)")
         if cfg["text_webhook_url"]:
             print("Text webhook:", "sent" if ok2 else "failed")
@@ -7054,7 +7597,8 @@ def main():
                 dashboard.render({"iface": busiest, "ip": whitelist.public_ip, "cpu": int(cpu),
                                   "pps": pps, "mbps": mbps, "blocked": blocked_count,
                                   "known": learner.count(),
-                                  "status": "mitigating" if tracker.active else "watching"})
+                                  "status": "mitigating" if tracker.active else "watching",
+                                  **_dash_attack(ctx.get("last_report") if tracker.active else None)})
                 if tracker.active and tracker.should_end(cfg):
                     summary = tracker.end()
                     if fw.lockdown:
@@ -7062,10 +7606,7 @@ def main():
                     escalator.withdraw_all()
                     metrics.update(attack_active=0, lockdown=0)
                     if summary and cfg["notify_on_end"]:
-                        send_text_webhook(cfg["text_webhook_url"],
-                                          f"NetDeflect attack #{summary['attack_id']} ended after "
-                                          f"{summary['duration']}s, peak {summary['peak_pps']} pps, "
-                                          f"{summary['total_blocked']} blocked, {summary['vectors']}")
+                        send_text_webhook(cfg["text_webhook_url"], build_text_end(summary))
                         send_discord_end(cfg["webhook_url"], summary)
                         run_notify_script(cfg, "ended", summary)
                 metrics.update(packets_per_second=pps, bytes_per_second=int(mbps * 1048576),
