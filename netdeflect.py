@@ -2782,7 +2782,7 @@ class FilterRule:
                 self.strategy)
 
     def short_id(self):
-        return hashlib.sha1(repr(self.key()).encode()).hexdigest()[:12]
+        return hashlib.sha256(repr(self.key()).encode()).hexdigest()[:12]
 
 
 class BaseFirewall:
