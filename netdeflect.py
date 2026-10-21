@@ -48,7 +48,7 @@ import configparser
 from collections import Counter, defaultdict
 from datetime import datetime
 
-VERSION = "4.0.0"
+VERSION = "4.0.1"
 VERSION_STRING = f"NetDeflect v{VERSION}"
 
 # Resolve paths relative to this script so the tool works under systemd / cron
