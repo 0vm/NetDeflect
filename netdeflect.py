@@ -803,8 +803,8 @@ conn_limit_ports = 80, 443
 conntrack_warn_percent = 80
 
 [whitelist]
-; Addresses that are never blocked. Your gateway, this server, your SSH session
-; and the DNS resolvers you use are protected automatically.
+; Addresses that are never blocked not even during a confirmed flood.
+; Your gateway, this server, your SSH session and the DNS resolvers you use are protected automatically.
 trusted_ips = 8.8.8.8, 8.8.4.4, 1.1.1.1, 1.0.0.1, 9.9.9.9
 ; Address ranges that are never blocked, e.g. your office or monitoring.
 trusted_networks =
@@ -953,6 +953,59 @@ def write_default_config(path=SETTINGS_FILE):
         fh.write(CONFIG_TEMPLATE)
 
 
+# v2 settings that v4 still honours under a new name (each warns where it is read)
+_RENAMED_V2_KEYS = {("triggers", "detection_threshold"), ("whitelist", "trusted_ports"),
+                    ("advanced_mitigation", "block_other_attack_contributors")}
+
+
+def _old_config_notes(parser, seen):
+    """Signs that settings.ini predates v4: renamed v2 keys, keys v4 no longer
+    reads (moved to another section or removed), and the autodetect_enforce
+    default that changes v2 behaviour without a key to show for it."""
+    template = configparser.ConfigParser(interpolation=None)
+    template.read_string(CONFIG_TEMPLATE)
+    known = {(s, k) for s in template.sections() for k in template.options(s)} | seen
+    renamed, unread = [], []
+    for sec in parser.sections():
+        if sec.lower().startswith("service:"):
+            continue
+        for key in parser.options(sec):
+            if (sec, key) in _RENAMED_V2_KEYS:
+                renamed.append(f"[{sec}] {key}")
+            elif (sec, key) not in known:
+                unread.append(f"[{sec}] {key}")
+    notes = []
+    if renamed:
+        notes.append("old v2 names still in use: " + ", ".join(renamed))
+    if unread:
+        more = f" and {len(unread) - 8} more" if len(unread) > 8 else ""
+        notes.append("settings v4 no longer reads, so they do nothing: "
+                     + ", ".join(unread[:8]) + more)
+    am = "advanced_mitigation"
+    if (parser.has_option(am, "block_autodetected_patterns")
+            and not parser.has_option(am, "autodetect_enforce")
+            and not parser.getboolean(am, "block_autodetected_patterns", fallback=False)):
+        notes.append("autodetect_enforce is not set and is on by default, so high-confidence "
+                     "learned patterns are now dropped where v2 only logged them (add "
+                     "autodetect_enforce = False to [advanced_mitigation] to keep the v2 behaviour)")
+    return notes
+
+
+def log_config_notes(cfg, path):
+    """Tell the operator, on every start and reload, that settings.ini predates v4."""
+    notes = cfg.get("config_notes")
+    if not notes:
+        return
+    path = os.path.abspath(path)
+    log.warning("%s has settings from an older NetDeflect, or ones it does not recognise: %s.",
+                os.path.basename(path), "; ".join(notes))
+    log.warning("Many settings changed in v4, so please update it. Write a fresh copy next to "
+                "it with the command below, copy your own values (webhook, [services] ports, "
+                "[whitelist]) into the new file, replace %s with it and run 'sudo systemctl "
+                "reload netdeflect': sudo python3 %s --write-default-config --config %s.new",
+                os.path.basename(path), os.path.abspath(__file__), path)
+
+
 def parse_ip_list(text):
     """Split on commas/whitespace and keep valid IPs or CIDRs."""
     out = []
@@ -1053,8 +1106,10 @@ def load_config(path=SETTINGS_FILE):
 
     cfg = {"profile": profile}
     errors = []
+    seen = set()   # every (section, key) the loader asks for, for _old_config_notes
 
     def req(section, key, cast=str, default=None):
+        seen.add((section, key))
         try:
             raw = parser.get(section, key)
         except (configparser.NoSectionError, configparser.NoOptionError):
@@ -1363,6 +1418,7 @@ def load_config(path=SETTINGS_FILE):
 
     if errors:
         raise ConfigError("settings.ini needs fixing:\n  - " + "\n  - ".join(errors))
+    cfg["config_notes"] = _old_config_notes(parser, seen)
     return cfg
 
 
@@ -1540,6 +1596,14 @@ class WhitelistGuard:
             return True
         for net in self.networks:
             if addr.version == net.version and addr in net:
+                return True
+        return False
+
+    def covers_protected(self, net):
+        """True when blocking `net` would also block a protected address."""
+        guard = (_NON_PUBLIC_V4 + _NON_PUBLIC_V6) if self.protect_private else []
+        for prot in list(self.networks) + guard:
+            if net.version == prot.version and net.overlaps(prot):
                 return True
         return False
 
@@ -4782,7 +4846,10 @@ def select_source_targets(src_counter, whitelist, cfg):
         by_subnet[net].append(ip)
     agg = cfg["subnet_aggregate_count"]
     for net, members in by_subnet.items():
-        if agg and len(members) >= agg:
+        # a /24 or /64 that holds a whitelisted address is never blocked as a
+        # whole; its unprotected members are blocked one by one instead - bug reported by Boxfrog1001 (was posted publicly rather than in the private vulnerability channel, so it is not a secret). The whitelist is always respected.
+        if (agg and len(members) >= agg
+                and not whitelist.covers_protected(ipaddress.ip_network(net))):
             nets.append(net)
         else:
             ips.extend(members)
@@ -7367,6 +7434,7 @@ def main():
         cfg["dry_run"] = True
 
     setup_logging(cfg, args)
+    log_config_notes(cfg, args.config)
     ensure_dirs()
     flow_mode = cfg["capture_method"] in ("sflow", "netflow")
     if not flow_mode:
@@ -7501,6 +7569,7 @@ def main():
                         cfg.clear()
                         cfg.update(newcfg)
                     reloaded = True
+                    log_config_notes(cfg, SETTINGS_FILE)
                 except ConfigError as exc:
                     log.error("Reload failed, keeping the previous settings:\n%s", exc)
                 sigs = load_signatures(cfg)
