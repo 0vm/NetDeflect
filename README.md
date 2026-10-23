@@ -14,25 +14,6 @@ It's made for game servers (FiveM, Minecraft, CS2, Rust, SA-MP, TeamSpeak and mo
 
 ---
 
-## Contents
-
-- [Demo](#demo)
-- [Installation](#installation)
-- [What it does](#what-it-does)
-- [Set up your server](#set-up-your-server)
-- [How it works](#how-it-works)
-- [Discord alerts](#discord-alerts)
-- [Commands](#commands)
-- [Settings](#settings)
-- [Good to know](#good-to-know)
-- [FAQ](#faq)
-- [Uninstalling](#uninstalling)
-
-Sorry it's long, it's the whole documentation in one file. Most people only need what's above, the [Advanced](#advanced) half is there when you want it.
-
-
----
-
 ## Demo
 
 <p>
@@ -55,6 +36,24 @@ https://github.com/user-attachments/assets/8ac4f69f-974f-4bde-91dd-708f092744d2
 https://github.com/user-attachments/assets/7f1beb7a-cab0-4565-b881-c19d3e40dd83
 
 </details>
+
+---
+
+## Contents
+
+- [Demo](#demo)
+- [Installation](#installation)
+- [What it does](#what-it-does)
+- [Set up your server](#set-up-your-server)
+- [How it works](#how-it-works)
+- [Discord alerts](#discord-alerts)
+- [Commands](#commands)
+- [Settings](#settings)
+- [Good to know](#good-to-know)
+- [FAQ](#faq)
+- [Uninstalling](#uninstalling)
+
+Sorry it's long, it's the whole documentation in one file. Most people only need what's above, the [Advanced](#advanced) half is there when you want it.
 
 ---
 
