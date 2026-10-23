@@ -1,6 +1,10 @@
 # 🛡️ NetDeflect
 
-**NetDeflect** is open-source DDoS protection for Linux servers. It watches the traffic reaching your server, recognises an attack as it builds, works out exactly what kind of attack it is, and drops it inside the Linux kernel while your players, users and services keep working. Then it tells you what happened on Discord.
+**NetDeflect** is open-source DDoS protection for Linux servers.
+
+> ⭐ Might need this later? Star the repo to save it and it helps others find it too :).
+
+It watches the traffic reaching your server, recognises an attack as it builds, works out exactly what kind of attack it is, and drops it inside the Linux kernel while your players, users and services keep working. Then it tells you what happened on Discord.
 
 It's built for game servers (FiveM, Minecraft, CS2, Rust, SA-MP, TeamSpeak and more), WireGuard and OpenVPN servers, and anything else exposed to the internet, from a one-core VPS to a 100G edge.
 
