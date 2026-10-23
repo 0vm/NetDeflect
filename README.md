@@ -1,21 +1,39 @@
-# 🛡️ NetDeflect
+# NetDeflect
 
-**NetDeflect** is open-source DDoS protection for Linux servers.
+NetDeflect is open-source DDoS protection for Linux servers.
 
-> ⭐ Might need this later? Star the repo to save it and it helps others find it too :).
+> ⭐ Might need this later? Star the repo to save it, and it helps other people find it too :).
 
-It watches the traffic reaching your server, recognises an attack as it builds, works out exactly what kind of attack it is, and drops it inside the Linux kernel while your players, users and services keep working. Then it tells you what happened on Discord.
+It watches the traffic reaching your server, recognises an attack when it crosses your threshold, works out exactly what kind of attack it is and drops it in the kernel, all while your players, users and services keep working. Then it tells you what happened on Discord.
 
-It's built for game servers (FiveM, Minecraft, CS2, Rust, SA-MP, TeamSpeak and more), WireGuard and OpenVPN servers, and anything else exposed to the internet, from a one-core VPS to a 100G edge.
+It's made for game servers (FiveM, Minecraft, CS2, Rust, SA-MP, TeamSpeak and more), WireGuard and OpenVPN servers, and anything else exposed to the internet, from a cheap one-core VPS to a 100G edge with the right configuration.
 
-One command to install. Nothing to compile.
+[One command installs it](#installation). Nothing to compile.
 
-> 👋 **NetDeflect is made for every skill level.** If you've never touched a firewall, the installer asks five simple questions and sets everything up for you. If you run your own network, every detail can be tuned. The first half of this page is all most people need. The **For advanced users** part at the bottom is completely optional, so feel free to ignore it.
+> It's made for every skill level. If you've never touched a firewall, the installer asks five simple questions and sets it up for you. If you run your own network, [every detail can be tuned](#advanced). The first half of this page is all most people need. The For advanced users part at the [bottom](#advanced) is completely optional, so feel free to ignore it.
 
 ---
 
-<a id="demo"></a>
-## 📽️ Demo
+## Contents
+
+- [Demo](#demo)
+- [Installation](#installation)
+- [What it does](#what-it-does)
+- [Set up your server](#set-up-your-server)
+- [How it works](#how-it-works)
+- [Discord alerts](#discord-alerts)
+- [Commands](#commands)
+- [Settings](#settings)
+- [Good to know](#good-to-know)
+- [FAQ](#faq)
+- [Uninstalling](#uninstalling)
+
+Sorry it's long, it's the whole documentation in one file. Most people only need what's above, the [Advanced](#advanced) half is there when you want it.
+
+
+---
+
+## Demo
 
 <p>
 <img width="72%" alt="NetDeflect mitigating an attack" src="https://github.com/user-attachments/assets/56a5ed68-dd9c-48a4-b482-20c7ae0d98a4" /><img width="26%" alt="NetDeflect alert" src="https://github.com/user-attachments/assets/38a3fcd9-6bf7-436d-814e-eec42f7a6f41" />
@@ -40,8 +58,7 @@ https://github.com/user-attachments/assets/7f1beb7a-cab0-4565-b881-c19d3e40dd83
 
 ---
 
-<a id="installation"></a>
-## 🚀 Installation
+## Installation
 
 You need a Linux server and root access.
 
@@ -79,7 +96,7 @@ On Fedora, Rocky or AlmaLinux: `dnf install python3 python3-psutil python3-reque
 
 </details>
 
-> 💡 **First day tip:** start in watch-only mode. NetDeflect reports exactly what it *would* block without blocking anything, so you can check it suits your traffic before switching it on.
+>  **First day tip:** start in watch-only mode. NetDeflect reports exactly what it *would* block without blocking anything, so you can check it suits your traffic before switching it on.
 <details>
 <summary>Installer options and upgrading</summary>
 
@@ -97,67 +114,22 @@ Run without a terminal (for example from a provisioning script), the installer w
 
 ---
 
+## What it does
 
-## 📑 Contents
+It sits there watching your traffic. When a flood starts it grabs a sample of packets, works out what kind of attack it is, and drops it in the kernel with nftables, so the server stays light even under a big one. It comes with 110 attack signatures and learns ones it hasn't seen by fingerprinting them.
 
-**Getting started** (everyone)
+The bits that matter most:
 
-- [📽️ Demo](#demo)
-- [🚀 Installation](#installation)
-- [✨ Features](#features)
-- [🎮 Setting it up for your server](#setup)
-- [🧠 How it works](#how-it-works)
-- [📢 Discord alerts](#alerts)
-- [🛠️ Commands](#commands)
-- [⚙️ Settings](#settings)
-- [🗑️ Uninstalling](#uninstalling)
-- [❓ FAQ](#faq)
-- [⚠️ Good to know](#good-to-know)
+- It never bans spoofed addresses. Most floods fake their source, so banning them is pointless and just firewalls innocent people. Those get dropped by pattern instead.
+- It learns your regular players while things are quiet and lets them through first during an attack, so a flood can't lock them out.
+- WireGuard and OpenVPN ports only accept real VPN packets, everything else is dropped.
+- You get a Discord alert (or Slack, Teams, Mattermost) with a plain summary, and it only pings you when there's actually something to do.
 
-**For advanced users** (optional, skip this if you just want your server protected)
-
-- [📋 Full feature list](#full-features)
-- [⚡ Does NetDeflect use XDP or eBPF?](#xdp)
-- [🔬 How it works in detail](#how-it-works-detail)
-- [🎮 Protecting game and VPN ports in detail](#game-vpn-detail)
-- [🪞 Reflection and amplification attacks](#reflection)
-- [📡 Large links: sFlow, NetFlow and 10G/100G](#large-links)
-- [🛠️ All commands](#all-commands)
-- [⚙️ Full configuration](#full-config)
-- [📜 Attack signatures](#signatures)
-- [🔌 Alerts and integrations](#integrations)
-- [📈 Metrics](#metrics)
-- [🌐 Upstream protection with BGP](#bgp)
-- [📦 Files](#files)
-- [❓ Advanced FAQ](#advanced-faq)
-- [🚧 Limitations](#limitations)
+The heavier stuff, XDP offload, sFlow/NetFlow on big links, BGP, Prometheus, custom signatures, is all in [Advanced](#advanced).
 
 ---
 
-<a id="features"></a>
-## ✨ Features
-
-- 📊 Live monitoring of packets per second, bandwidth and CPU, with a live status screen
-- 🚨 110 built-in attack signatures, matched on real packet fields (not text guessing)
-- 🧠 Learns attacks nothing recognises by fingerprinting them (source port, TTL, flags, length, payload) and drops them automatically
-- 🔥 Drops attacks in the kernel with nftables, so NetDeflect itself stays light even during a huge flood
-- 🪞 Stops reflection and amplification (NTP, DNS, memcached, SSDP, CLDAP and 50+ more) by the shape of the reply, not just the port, so your own services are never mistaken for an attack
-- 🎮 Game and VPN protection: learns your real players and lets them through first, and caps everyone else during an attack
-- 🔐 WireGuard and OpenVPN validation drops anything that isn't a real VPN packet
-- 🕵️ Never blocks faked addresses, so an attacker can't trick it into blocking someone innocent
-- ⚡ Optional XDP fast path for busy 10G+ servers
-- 📡 sFlow, NetFlow and BGP support for networks with their own routers
-- 💬 Discord alerts coloured by result, with a plain-English summary and clear advice when you need to act. Slack, Teams and Mattermost too
-- 📁 A report, address list and packet capture saved for every attack
-- 📈 Prometheus metrics, a JSON event log, your own script hook and external firewall API support
-- 🔄 Tells you when a new version is out
-
-Want every detail? See the [full feature list](#full-features).
-
----
-
-<a id="setup"></a>
-## 🎮 Setting it up for your server
+## Set up your server
 
 Most servers only need two things in `settings.ini`: your webhook and `[services] ports`.
 
@@ -182,8 +154,7 @@ After editing `settings.ini`, apply it with `sudo systemctl reload netdeflect`.
 
 ---
 
-<a id="how-it-works"></a>
-## 🧠 How it works
+## How it works
 
 1. **Watch.** Every second NetDeflect checks how much traffic is arriving. This costs almost nothing.
 2. **Sample.** When traffic crosses your thresholds, it grabs a sample of packets to inspect. CPU use stays the same however big the attack is.
@@ -206,22 +177,20 @@ After editing `settings.ini`, apply it with `sudo systemctl reload netdeflect`.
 
 ---
 
-<a id="alerts"></a>
-## 📢 Discord alerts
+## Discord alerts
 
 Add your Discord webhook to `[notification] webhook_url` in `settings.ini`, then run `sudo python3 netdeflect.py --test-webhook` to see a sample.
 
 <img width="734" height="602" alt="image" src="https://github.com/user-attachments/assets/116c66cd-1071-402d-93d1-395b655b7514" />
 
-
 Every alert includes:
 
-- 🟢 🟠 🔴 A colour showing how it's going: mitigated, partially mitigated, or not yet stopped
-- 📝 A one-line summary in plain English, like *"Zero-fill UDP Flood against 203.0.113.10 port 53. Dropping 68,347 pps (62% of incoming) in the kernel."*
-- 📈 Incoming traffic, how much is being dropped, and what's still getting through
-- 🎯 Which ports are being hit, the attack types, and any learned pattern
-- 🚫 What was blocked
-- ⚠️ "Action needed", but only when something's wrong, telling you exactly what to change
+- A colour showing how it's going: mitigated, partially mitigated, or not yet stopped
+- A one-line summary in plain English, like *"Zero-fill UDP Flood against 203.0.113.10 port 53. Dropping 68,347 pps (62% of incoming) in the kernel."*
+- Incoming traffic, how much is being dropped, and what's still getting through
+- Which ports are being hit, the attack types, and any learned pattern
+- What was blocked
+- "Action needed", but only when something's wrong, telling you exactly what to change
 
 You get an alert when an attack starts, when a new attack type shows up, and a summary when it ends, so your channel doesn't get spammed.
 
@@ -233,8 +202,7 @@ You get an alert when an attack starts, when a new attack type shows up, and a s
 
 ---
 
-<a id="commands"></a>
-## 🛠️ Commands
+## Commands
 
 | Command | What it does |
 |---|---|
@@ -248,12 +216,9 @@ You get an alert when an attack starts, when a new attack type shows up, and a s
 | `--list-blocks` | See what's blocked |
 | `--stats` | How many packets have been dropped |
 
-Block commands work while NetDeflect is running. More in [All commands](#all-commands).
-
 ---
 
-<a id="settings"></a>
-## ⚙️ Settings
+## Settings
 
 Every option is explained inside `settings.ini`. The ones you're most likely to change:
 
@@ -271,22 +236,19 @@ Set the thresholds a little above your busiest normal traffic. The live status s
 
 ---
 
-<a id="uninstalling"></a>
-## 🗑️ Uninstalling
+## Good to know
 
-```bash
-sudo systemctl disable --now netdeflect
-sudo rm /etc/systemd/system/netdeflect.service
-sudo python3 /opt/NetDeflect/netdeflect.py --teardown
-sudo rm -r /opt/NetDeflect
-```
+- If an attack is bigger than your internet connection, it has to be stopped upstream by your host or with BGP. No software on the server can stop a full pipe.
+- An attack has to cross your thresholds before NetDeflect acts, so set them a little above your normal peak, not miles above it.
+- An attack that randomises absolutely everything and matches no signature can't be dropped by pattern. On your `[services]` ports, lockdown still keeps it in check.
+- If you run a service yourself that a signature could clash with (a web server and HTTP reflection, for example), disable that signature in `methods.json`.
+- Linux only, and it needs root.
 
-Stopping the service already removes NetDeflect's rules. `--teardown` cleans up anything left over (only the rules, sets, routes and XDP programs NetDeflect created).
+Found a bug or have an idea? Open an issue with as much detail as you can. Logs from `journalctl -u netdeflect` and the attack report help a lot.
 
 ---
 
-<a id="faq"></a>
-## ❓ FAQ
+## FAQ
 
 **Will it block my players?**
 No. Players are never blocked by address unless they send botnet traffic. During an attack, your learned players go first. Try watch-only mode first if you want to be sure.
@@ -308,28 +270,44 @@ If an attack is bigger than your server's internet connection, the connection is
 
 ---
 
-<a id="good-to-know"></a>
-## ⚠️ Good to know
+## Uninstalling
 
-- If an attack is bigger than your internet connection, it has to be stopped upstream by your host or with BGP. No software on the server can stop a full pipe.
-- An attack has to cross your thresholds before NetDeflect acts, so set them a little above your normal peak, not miles above it.
-- An attack that randomises absolutely everything and matches no signature can't be dropped by pattern. On your `[services]` ports, lockdown still keeps it in check.
-- If you run a service yourself that a signature could clash with (a web server and HTTP reflection, for example), disable that signature in `methods.json`.
-- Linux only, and it needs root.
+```bash
+sudo systemctl disable --now netdeflect
+sudo rm /etc/systemd/system/netdeflect.service
+sudo python3 /opt/NetDeflect/netdeflect.py --teardown
+sudo rm -r /opt/NetDeflect
+```
 
-Found a bug or have an idea? Open an issue with as much detail as you can. Logs from `journalctl -u netdeflect` and the attack report help a lot.
-
----
----
-
-# 🧪 For advanced users
-
-> **Everything from here down is optional.** NetDeflect works out of the box with the settings the installer gives you. This part is for people who want to know exactly how it works, tune it, or run it on their own network. If that's not you, you can stop reading here. 🎉
+Stopping the service already removes NetDeflect's rules. `--teardown` cleans up anything left over (only the rules, sets, routes and XDP programs NetDeflect created).
 
 ---
 
-<a id="full-features"></a>
-## 📋 Full feature list
+# Advanced
+
+Everything below is optional. NetDeflect works out of the box with the installer's answers. This half is for tuning it, running it on your own network, or understanding exactly what it does.
+
+## Advanced contents
+
+- [Full feature list](#full-feature-list)
+- [How it works in detail](#how-it-works-in-detail)
+- [Game and VPN ports](#game-and-vpn-ports)
+- [Reflection and amplification](#reflection-and-amplification)
+- [Does NetDeflect use XDP or eBPF?](#does-netdeflect-use-xdp-or-ebpf)
+- [Large links: sFlow, NetFlow and 10G/100G](#large-links-sflow-netflow-and-10g100g)
+- [All commands](#all-commands)
+- [Configuration reference](#configuration-reference)
+- [Attack signatures](#attack-signatures)
+- [Alerts and integrations](#alerts-and-integrations)
+- [Metrics](#metrics)
+- [Upstream protection with BGP](#upstream-protection-with-bgp)
+- [Files](#files)
+- [Advanced FAQ](#advanced-faq)
+- [Limitations](#limitations)
+
+---
+
+## Full feature list
 
 ### Detection
 - Live monitoring of packets per second, bandwidth and CPU on one or several interfaces, with a live status screen.
@@ -398,25 +376,7 @@ Found a bug or have an idea? Open an issue with as much detail as you can. Logs 
 
 ---
 
-<a id="xdp"></a>
-## ⚡ Does NetDeflect use XDP or eBPF?
-
-Optionally, yes. Set `firewall_system = xdp` and NetDeflect loads xdp-tools' `xdp-filter` on your interface, so the source addresses it bans (reflectors, botnet sources, `--block` and `block_ips`) are dropped in the NIC driver with **XDP**, before the packet reaches the kernel's network stack. It needs the `xdp-tools` package and an interface whose driver supports XDP, with nothing for you to compile. If either is missing it falls back to skb/generic XDP and then to plain nftables, so protection is never reduced.
-
-By default NetDeflect does not turn XDP on, because for most servers the nftables `prerouting` raw hook (before connection tracking) already drops at line rate for the pipe, needs no extra package and runs everywhere. Turn XDP on when you are dropping a lot of traffic on the host itself, typically a 10G+ box, and want the banned sources gone in the driver before they cost the stack anything.
-
-What is and is not XDP here:
-
-- **The drop of banned source addresses is real XDP,** in the NIC driver, via xdp-filter (native, skb/generic or hardware-offload mode). It holds a bounded working set (`xdp_max_entries`, at most 10000 per address family), heaviest sources first; nftables keeps the rest, and does all of the pattern and spoofed-source dropping, range bans and blocklist ranges, which a by-address XDP filter cannot express.
-- **nftables stays the authority.** The XDP map is reconciled against nftables' bans every few seconds and on every change, so an address leaves XDP no later than it leaves nftables: when its ban expires, when you `--unblock` it, or after a crash (the service runs `--teardown` on stop, which unloads xdp-filter too). xdp-filter is loaded once; rule changes do not reload it.
-- **XDP drops are counted.** `--stats`, reports and alerts include packets dropped in XDP. Because XDP runs before the packet sniffer, a round in which XDP drops the whole attack is reported as mitigated.
-- xdp-filter keeps its map in the BPF filesystem; NetDeflect mounts it at `/sys/fs/bpf` if your system has not (containers, minimal VMs, WSL).
-- **The classifier is not eBPF.** NetDeflect samples the traffic, works out the attack and decides what to ban in userspace, then hands the bans to XDP and nftables. The only BPF in the capture path is a classic (cBPF) tcpdump-style filter, which never drops anything.
-
----
-
-<a id="how-it-works-detail"></a>
-## 🔬 How it works in detail
+## How it works in detail
 
 1. **Watch.** Every second NetDeflect reads the packet and byte counters of the interfaces you protect. This costs almost nothing.
 2. **Trigger.** When traffic crosses your thresholds, NetDeflect samples a limited number of packets (`packet_count`). Its CPU use depends on this number, not on the size of the attack.
@@ -453,8 +413,7 @@ The first line of defence keeps no per-connection state. Floods with fake source
 
 ---
 
-<a id="game-vpn-detail"></a>
-## 🎮 Protecting game and VPN ports in detail
+## Game and VPN ports
 
 List your public ports in `[services] ports`. During an attack aimed at them:
 
@@ -489,8 +448,7 @@ Ports listed in `[whitelist] bypass_ports` skip every check, which also means th
 
 ---
 
-<a id="reflection"></a>
-## 🪞 Reflection and amplification attacks
+## Reflection and amplification
 
 In a reflection attack, the attacker sends requests to thousands of public servers (DNS, NTP, memcached, SSDP, CLDAP and many more) with your address as the sender, and those servers flood you with replies.
 
@@ -502,8 +460,23 @@ Settings: `block_reflectors`, `reflector_block_percent` (0 blocks every reflecto
 
 ---
 
-<a id="large-links"></a>
-## 📡 Large links: sFlow, NetFlow and 10G/100G
+## Does NetDeflect use XDP or eBPF?
+
+Optionally, yes. Set `firewall_system = xdp` and NetDeflect loads xdp-tools' `xdp-filter` on your interface, so the source addresses it bans (reflectors, botnet sources, `--block` and `block_ips`) are dropped in the NIC driver with **XDP**, before the packet reaches the kernel's network stack. It needs the `xdp-tools` package and an interface whose driver supports XDP, with nothing for you to compile. If either is missing it falls back to skb/generic XDP and then to plain nftables, so protection is never reduced.
+
+By default NetDeflect does not turn XDP on, because for most servers the nftables `prerouting` raw hook (before connection tracking) already drops at line rate for the pipe, needs no extra package and runs everywhere. Turn XDP on when you are dropping a lot of traffic on the host itself, typically a 10G+ machine, and want the banned sources gone in the driver before they cost the stack anything.
+
+What is and is not XDP here:
+
+- **The drop of banned source addresses is real XDP,** in the NIC driver, via xdp-filter (native, skb/generic or hardware-offload mode). It holds a bounded working set (`xdp_max_entries`, at most 10000 per address family), heaviest sources first; nftables keeps the rest, and does all of the pattern and spoofed-source dropping, range bans and blocklist ranges, which a by-address XDP filter cannot express.
+- **nftables stays the authority.** The XDP map is reconciled against nftables' bans every few seconds and on every change, so an address leaves XDP no later than it leaves nftables: when its ban expires, when you `--unblock` it, or after a crash (the service runs `--teardown` on stop, which unloads xdp-filter too). xdp-filter is loaded once; rule changes do not reload it.
+- **XDP drops are counted.** `--stats`, reports and alerts include packets dropped in XDP. Because XDP runs before the packet sniffer, a round in which XDP drops the whole attack is reported as mitigated.
+- xdp-filter keeps its map in the BPF filesystem; NetDeflect mounts it at `/sys/fs/bpf` if your system has not (containers, minimal VMs, WSL).
+- **The classifier is not eBPF.** NetDeflect samples the traffic, works out the attack and decides what to ban in userspace, then hands the bans to XDP and nftables. The only BPF in the capture path is a classic (cBPF) tcpdump-style filter, which never drops anything.
+
+---
+
+## Large links: sFlow, NetFlow and 10G/100G
 
 On a 10G, 40G or 100G link you do not sniff every packet in userspace, and you do not want your mitigation sitting inline where a failure takes the whole link down. NetDeflect handles this the way carrier networks do: the router or switch samples traffic in hardware and exports it as sFlow or NetFlow, NetDeflect reads that telemetry out of band, and mitigation is sent upstream over BGP. If NetDeflect stops, the router keeps forwarding and the link stays up, so there is nothing to fail closed.
 
@@ -543,8 +516,7 @@ Then point your router or switch at this host's address and `listen_port`.
 
 ---
 
-<a id="all-commands"></a>
-## 🛠️ All commands
+## All commands
 
 | Command | What it does |
 |---|---|
@@ -577,8 +549,7 @@ sudo systemctl reload netdeflect      # re-read settings.ini and methods.json
 
 ---
 
-<a id="full-config"></a>
-## ⚙️ Full configuration
+## Configuration reference
 
 All settings live in `settings.ini`, and every option is explained in the file itself. Settings you leave out use their defaults. The sections:
 
@@ -625,8 +596,7 @@ All settings live in `settings.ini`, and every option is explained in the file i
 
 ---
 
-<a id="signatures"></a>
-## 📜 Attack signatures
+## Attack signatures
 
 Signatures live in `methods.json`. Each one describes packets by their fields; every field given must match.
 
@@ -661,7 +631,7 @@ Signatures live in `methods.json`. Each one describes packets by their fields; e
 
 | Option | Meaning |
 |---|---|
-| `category` | Decides the response (see [How it works in detail](#how-it-works-detail)) |
+| `category` | Decides the response (see How it works in detail) |
 | `action` | Override the response: `drop`, `ratelimit`, `block_src`, `allow`, `report` |
 | `rate_pps` | Packets per second per source for `ratelimit` |
 | `block_time` | Seconds a block from this signature lasts |
@@ -680,8 +650,7 @@ Remove or disable signatures for services you run yourself in a way that could c
 
 ---
 
-<a id="integrations"></a>
-## 🔌 Alerts and integrations
+## Alerts and integrations
 
 **Discord.** Set `webhook_url`. The default `discord_style = rich` sends the built-in alert. To use your own layout, set `discord_style = template` and edit `notification_template.json`. Placeholders: `{{attack_id}}`, `{{summary}}`, `{{action_needed}}`, `{{pps}}`, `{{mbps}}`, `{{cpu}}`, `{{status}}`, `{{dropped_pps}}`, `{{dropped_pct}}`, `{{passed_pps}}`, `{{attack_vector}}`, `{{attack_category}}`, `{{blocking_strategy}}`, `{{target_ip}}`, `{{target_port}}`, `{{top_ports}}`, `{{protocol_mix}}`, `{{unique_sources}}`, `{{source_kind}}`, `{{block_count}}`, `{{net_count}}`, `{{hostname}}`, `{{report_file}}`.
 
@@ -695,8 +664,7 @@ Remove or disable signatures for services you run yourself in a way that could c
 
 ---
 
-<a id="metrics"></a>
-## 📈 Metrics
+## Metrics
 
 With `[metrics] prometheus_enabled = True`, NetDeflect publishes:
 
@@ -719,8 +687,7 @@ With `[metrics] prometheus_enabled = True`, NetDeflect publishes:
 
 ---
 
-<a id="bgp"></a>
-## 🌐 Upstream protection with BGP
+## Upstream protection with BGP
 
 When an attack is bigger than your connection, nothing on the server can help: the connection is already full before packets arrive. If you have a BGP session with your provider, NetDeflect can ask upstream routers to drop traffic for the attacked address (remote-triggered blackhole):
 
@@ -736,14 +703,13 @@ escalate_on_saturation = True          ; or when the network card keeps dropping
 
 Blackholing takes the attacked address offline upstream to protect the rest of your network, so it only happens on these conditions and is withdrawn `escalation_withdraw_after` seconds after the attack ends.
 
-**BGP as the whole mitigation path.** Set `firewall_system = bgp` and NetDeflect installs no local rules at all: it asks your upstream to drop the attacker prefixes it identifies (and/or hands them to an external API), rather than dropping anything on this host. This is the out-of-band mode used with sFlow/NetFlow and on 10G/100G links; see [Large links](#large-links). Announcing attacker sources needs BGP FlowSpec or source-based RTBH at your provider; destination blackhole of your own address on uplink saturation works with plain RTBH.
+**BGP as the whole mitigation path.** Set `firewall_system = bgp` and NetDeflect installs no local rules at all: it asks your upstream to drop the attacker prefixes it identifies (and/or hands them to an external API), rather than dropping anything on this host. This is the out-of-band mode used with sFlow/NetFlow and on 10G/100G links; see Large links. Announcing attacker sources needs BGP FlowSpec or source-based RTBH at your provider; destination blackhole of your own address on uplink saturation works with plain RTBH.
 
 Providers set a max-prefix limit on BGP sessions, and going over it drops the whole session. A reflection attack can involve tens of thousands of reflectors, so NetDeflect announces at most `[escalation] max_announced_prefixes` (default 500) attacker prefixes at once, heaviest first; set it below your provider's limit. The blackhole of your own address when the uplink is full is always sent. If ExaBGP is not reading its command pipe, NetDeflect logs that nothing was announced instead of waiting on the pipe.
 
 ---
 
-<a id="files"></a>
-## 📦 Files
+## Files
 
 A checkout holds only four files. Everything else is written the first time NetDeflect runs, or when you install the service, so there is nothing generated to keep in the repository.
 
@@ -774,16 +740,15 @@ The systemd unit is written to `/etc/systemd/system/netdeflect.service` by `--in
 
 ---
 
-<a id="advanced-faq"></a>
-## ❓ Advanced FAQ
+## Advanced FAQ
 
 **Does it need connection tracking?** No. It is optional and off by default.
 
 **Which firewall should I use?** nftables. It supports every feature and is installed on all current distributions. Use `xdp` (nftables plus xdp-filter) when you want banned sources dropped in the NIC driver on a busy host. iptables with ipset works for most features; the blackhole option can only block addresses; the bgp option installs no local rules and mitigates upstream (for sFlow/NetFlow and 10G/100G).
 
-**Does it support sFlow or analysis on 10G/100G interfaces with a heavy baseline?** Yes. Set `capture_method = sflow` (or `netflow`) and point your router or switch at it; set `firewall_system = bgp` so mitigation is sent upstream. NetDeflect then runs out of band, so unlike an inline appliance it cannot fail closed and take your link down, and its shape-based detection keeps false positives low on busy service ports. See [Large links](#large-links).
+**Does it support sFlow or analysis on 10G/100G interfaces with a heavy baseline?** Yes. Set `capture_method = sflow` (or `netflow`) and point your router or switch at it; set `firewall_system = bgp` so mitigation is sent upstream. NetDeflect then runs out of band, so unlike an inline appliance it cannot fail closed and take your link down, and its shape-based detection keeps false positives low on busy service ports. See Large links.
 
-**Does it use XDP or eBPF?** Optionally. With `firewall_system = xdp` it drops banned source addresses in the NIC driver with XDP (via xdp-tools' xdp-filter); nftables still does the classification and the pattern and spoofed-flood drops. See [Does NetDeflect use XDP or eBPF?](#xdp) for exactly what is and is not XDP here.
+**Does it use XDP or eBPF?** Optionally. With `firewall_system = xdp` it drops banned source addresses in the NIC driver with XDP (via xdp-tools' xdp-filter); nftables still does the classification and the pattern and spoofed-flood drops. See the XDP section for exactly what is and is not XDP here.
 
 **Is Docker port forwarding covered?** Yes. NetDeflect's rules run before Docker's port forwarding, so the public ports you list in `[services]` are protected.
 
@@ -791,8 +756,7 @@ The systemd unit is written to `/etc/systemd/system/netdeflect.service` by `--in
 
 ---
 
-<a id="limitations"></a>
-## 🚧 Limitations
+## Limitations
 
 - An attack that fills your connection cannot be fixed on the server; use your provider's protection, BGP blackholing, or out-of-band flow mode with `firewall_system = bgp` for that.
 - NetDeflect samples traffic when a threshold is crossed, so an attack has to reach your thresholds to be acted on. Per-protocol triggers help with smaller targeted floods.
@@ -804,14 +768,6 @@ The systemd unit is written to `/etc/systemd/system/netdeflect.service` by `--in
 
 ---
 
-### 🏷️ Tags
+## Licence
 
-**Security:** DDoS protection, DDoS mitigation, anti-DDoS, network security, attack detection, traffic analysis
-
-**Technologies:** Python, nftables, iptables, ipset, XDP, eBPF, sFlow, NetFlow, IPFIX, BGP, FlowSpec, RTBH, ExaBGP
-
-**Attack types:** reflection attacks, amplification attacks, SYN floods, UDP floods, ACK floods, botnet attacks, carpet bombing, pulse-wave attacks
-
-**Games and services:** FiveM, Minecraft, CS2, Rust, Garry's Mod, SA-MP, TeamSpeak, WireGuard, OpenVPN, Pterodactyl
-
-**Features:** real-time monitoring, automatic attack detection, pattern learning, Discord webhooks, Prometheus metrics, API integration
+Apache-2.0, see `LICENSE`. If you redistribute NetDeflect or run it for other people, please keep the NetDeflect credit in the alerts.
