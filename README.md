@@ -10,7 +10,7 @@ It's made for game servers (FiveM, Minecraft, CS2, Rust, SA-MP, TeamSpeak and mo
 
 [One command installs it](#installation). Nothing to compile.
 
-> It's made for every skill level. If you've never touched a firewall, the installer asks five simple questions and sets it up for you. If you run your own network, [every detail can be tuned](#advanced). The first half of this page is all most people need. The For advanced users part at the [bottom](#advanced) is completely optional, so feel free to ignore it.
+> It's made for every skill level. The installer asks five questions and sets it up for you. If you run your own network, [every detail can be tuned](#advanced).
 
 ---
 
