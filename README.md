@@ -1,6 +1,6 @@
 <p align="center">
   <img
-    src="https://github.com/user-attachments/assets/aaa47dd0-2c4c-4166-8114-ac21204fa5b2"
+    src="https://github.com/user-attachments/assets/b54ba125-4137-42a0-b494-fed2e28aba75"
     width="100%"
     alt="NetDeflect - DDoS Mitigation"
   />
