@@ -2,21 +2,33 @@
   <img
     src="https://github.com/user-attachments/assets/b54ba125-4137-42a0-b494-fed2e28aba75"
     width="100%"
-    alt="NetDeflect - DDoS Mitigation"
+    alt="NetDeflect: open-source DDoS protection for Linux servers"
   />
 </p>
 
-> ⭐ Might need this later? Star the repo to save it, and it helps other people find it too :)
+<p align="center">
+  <a href="#installation"><b>Install</b></a> &nbsp;·&nbsp;
+  <a href="#advanced">Advanced setup</a> &nbsp;·&nbsp;
+  <a href="https://github.com/0vm/NetDeflect/issues">Report an issue</a>
+</p>
 
-NetDeflect is open-source DDoS protection for most Linux servers.
+<p align="center">
+  <img src="https://img.shields.io/github/stars/0vm/NetDeflect?style=flat-square" alt="GitHub stars">
+  <img src="https://img.shields.io/github/last-commit/0vm/NetDeflect?style=flat-square" alt="Last commit">
+</p>
 
-It watches the traffic reaching your server, recognises an attack when it crosses your threshold, works out exactly what kind of attack it is and drops it in the kernel, all while your players, users and services keep working. Then it tells you what happened on Discord.
+**NetDeflect is open-source DDoS protection for Linux servers.** It watches the traffic reaching your server, and when an attack crosses your threshold it works out exactly what kind it is and drops it in the kernel. Your players, users and services keep working the whole time and you get a Discord notification telling you what happened.
 
-It's made for game servers (FiveM, Minecraft, CS2, Rust, SA-MP, TeamSpeak and more), WireGuard and OpenVPN servers, and anything else exposed to the internet, from a cheap one-core VPS to a 100G edge with the right configuration.
+**Made for**
 
-[One command installs it](#installation). Nothing to compile.
+- Game servers, including FiveM, Minecraft, CS2, Rust, SA-MP and TeamSpeak
+- WireGuard and OpenVPN servers
+- Anything else exposed to the internet, from a one-core VPS to a 100G edge with the right configuration
 
-> It's made for every skill level. The installer asks five questions and sets it up for you. If you run your own network, [every detail can be tuned](#advanced).
+**One command sets it up.** There's nothing to compile, and the installer asks five questions and configures everything for you. If you run your own network, [every setting can be tuned](#advanced).
+
+> <sub>⭐ Might need this later? Star the repo to save it. It also helps other server owners find it :) </sub>
+
 
 ---
 
